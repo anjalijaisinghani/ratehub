@@ -52,7 +52,7 @@ One login serves three roles: **System Administrator**, **Normal User** and **St
 ## Project Structure
 
 ```
-store-rating-app/
+fullstack-store-rating/
 ├── backend/
 │   ├── src/
 │   │   ├── config/db.js
@@ -81,7 +81,7 @@ Node.js 18+, MySQL or MariaDB (XAMPP works), Git.
 
 ### 1. Clone
 ```
-git clone https://github.com/YOUR-USERNAME/ratehub.git
+git clone https://github.com/anjalijaisinghani/ratehub.git
 cd ratehub
 ```
 
@@ -169,7 +169,42 @@ Average ratings are calculated with `AVG()` on demand, so they are never stale.
 - Validation is enforced on both frontend and backend
 
 ## Screenshots
-Add images from the `screenshots/` folder here.
+
+### Landing Page
+![Landing Page](screenshots/01-landing.png)
+
+### Login
+![Login](screenshots/02-login.png)
+
+### Signup
+![Signup](screenshots/03-signup.png)
+
+### Admin Dashboard
+![Admin Dashboard](screenshots/04-admin-dashboard.png)
+
+### Admin Users
+![Admin Users](screenshots/05-admin-users.png)
+
+### Admin Stores
+![Admin Stores](screenshots/06-admin-stores.png)
+
+### Add User
+![Add User](screenshots/07-add-user.png)
+
+### Add Store
+![Add Store](screenshots/08-add-store.png)
+
+### User Stores & Rating
+![User Stores](screenshots/09-user-stores.png)
+
+### Owner Dashboard
+![Owner Dashboard](screenshots/10-owner-dashboard.png)
+
+### Change Password
+![Change Password](screenshots/11-change-password.png)
+
+### Dark Mode
+![Dark Mode](screenshots/12-dark-mode.png)
 
 ## Future Improvements
 Pagination, refresh tokens, email verification, store images and reviews with comments, automated tests.
