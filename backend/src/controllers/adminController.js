@@ -195,8 +195,119 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+// module.exports = {
+//   getDashboard,
+//   addUser,
+//   addStore,
+//   listUsers,
+//   listStores,
+//   getUserDetails,
+// };
+
+// ---------- 7. Analytics for the dashboard charts ----------
+// GET /api/admin/analytics
+const pad = (n) => String(n).padStart(2, '0');
+const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+const getAnalytics = async (req, res) => {
+  try {
+    // Run all queries at the same time (faster than one after another)
+    const [
+      [[users]],
+      [[stores]],
+      [[ratings]],
+      [[avg]],
+      [distRows],
+      [roleRows],
+      [topStores],
+      [ratingDays],
+      [userDays],
+      [recent],
+    ] = await Promise.all([
+      db.query('SELECT COUNT(*) AS total FROM users'),
+      db.query('SELECT COUNT(*) AS total FROM stores'),
+      db.query('SELECT COUNT(*) AS total FROM ratings'),
+      db.query('SELECT ROUND(AVG(rating), 2) AS average FROM ratings'),
+      db.query('SELECT rating, COUNT(*) AS count FROM ratings GROUP BY rating'),
+      db.query('SELECT role, COUNT(*) AS count FROM users GROUP BY role'),
+      db.query(
+        `SELECT s.id, s.name,
+                ROUND(AVG(r.rating), 1) AS averageRating,
+                COUNT(r.id) AS totalRatings
+         FROM stores s
+         JOIN ratings r ON r.store_id = s.id
+         GROUP BY s.id
+         ORDER BY AVG(r.rating) DESC, COUNT(r.id) DESC
+         LIMIT 5`
+      ),
+      db.query(
+        `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS day, COUNT(*) AS count
+         FROM ratings
+         WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+         GROUP BY day`
+      ),
+      db.query(
+        `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS day, COUNT(*) AS count
+         FROM users
+         WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+         GROUP BY day`
+      ),
+      db.query(
+        `SELECT r.id, u.name AS userName, s.name AS storeName, r.rating, r.updated_at AS ratedAt
+         FROM ratings r
+         JOIN users u  ON u.id = r.user_id
+         JOIN stores s ON s.id = r.store_id
+         ORDER BY r.updated_at DESC
+         LIMIT 8`
+      ),
+    ]);
+
+    // Make sure every rating 1..5 appears, even with 0 votes
+    const ratingDistribution = [1, 2, 3, 4, 5].map((star) => {
+      const found = distRows.find((r) => r.rating === star);
+      return { rating: star, count: found ? found.count : 0 };
+    });
+
+    // Make sure the last 7 days all appear, even with 0 activity
+    const activity = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = dayKey(d);
+      activity.push({
+        day: key,
+        ratings: (ratingDays.find((r) => r.day === key) || { count: 0 }).count,
+        newUsers: (userDays.find((r) => r.day === key) || { count: 0 }).count,
+      });
+    }
+
+    res.json({
+      totals: {
+        totalUsers: users.total,
+        totalStores: stores.total,
+        totalRatings: ratings.total,
+        averageRating: avg.average !== null ? Number(avg.average) : null,
+      },
+      ratingDistribution,
+      usersByRole: roleRows,
+      topStores: topStores.map((s) => ({
+        id: s.id,
+        name: s.name,
+        averageRating: Number(s.averageRating),
+        totalRatings: s.totalRatings,
+      })),
+      activity,
+      recentRatings: recent,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getDashboard,
+  getAnalytics,
   addUser,
   addStore,
   listUsers,

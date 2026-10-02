@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   getDashboard,
+  getAnalytics,
   addUser,
   addStore,
   listUsers,
@@ -25,6 +26,7 @@ const router = express.Router();
 router.use(authenticate, authorize('ADMIN'));
 
 router.get('/dashboard', getDashboard);
+router.get('/analytics', getAnalytics);
 
 router.post(
   '/users',
