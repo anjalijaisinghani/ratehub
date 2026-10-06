@@ -16,7 +16,7 @@ export default function AddStore() {
     const loadOwners = async () => {
       try {
         const res = await api.get('/admin/users', { params: { role: 'OWNER', sortBy: 'name', order: 'asc' } });
-        setOwners(res.data);
+        setOwners(res.data.data);
       } catch (err) {
         showError(err.response?.data?.message || 'Could not load owners');
       }

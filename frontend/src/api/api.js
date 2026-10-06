@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // All requests go to our backend
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
 });
 
 // Before every request, attach the token (if the user is logged in)

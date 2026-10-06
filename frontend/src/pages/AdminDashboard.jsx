@@ -62,7 +62,7 @@ export default function AdminDashboard() {
   const load = useCallback(async () => {
     try {
       const res = await api.get('/admin/analytics');
-      setData(res.data);
+      setData(res.data.data);
       setUpdatedAt(new Date());
       setError('');
     } catch (err) {

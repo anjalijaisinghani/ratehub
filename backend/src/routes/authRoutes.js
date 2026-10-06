@@ -6,6 +6,7 @@ const {
   emailRule,
   addressRule,
   passwordRule,
+  loginPasswordRule,
   handleValidation,
 } = require('../utils/validators');
 
@@ -17,11 +18,7 @@ router.post(
   signup
 );
 
-router.post(
-  '/login',
-  [emailRule, passwordRule('password'), handleValidation],
-  login
-);
+router.post('/login', [emailRule, loginPasswordRule, handleValidation], login);
 
 // Protected: user must be logged in (token required)
 router.put(

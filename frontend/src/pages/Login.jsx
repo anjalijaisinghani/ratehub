@@ -25,8 +25,9 @@ export default function Login() {
 
     try {
       const res = await api.post('/auth/login', form);
-      login(res.data.token, res.data.user);
-      toast(`Welcome back, ${res.data.user.name.split(' ')[0]}!`);
+      const { token, user } = res.data.data;
+      login(token, user);
+      toast(`Welcome back, ${user.name.split(' ')[0]}!`);
       navigate('/');
     } catch (err) {
       showError(err.response?.data?.message || 'Could not connect to server');

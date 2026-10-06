@@ -17,7 +17,7 @@ export default function AdminUsers() {
       setLoading(true);
       try {
         const res = await api.get('/admin/users', { params: { ...filters, sortBy, order } });
-        setUsers(res.data);
+        setUsers(res.data.data);
         setError('');
       } catch (err) {
         setError(err.response?.data?.message || 'Could not load users');
@@ -43,7 +43,7 @@ export default function AdminUsers() {
   const showDetails = async (row) => {
     try {
       const res = await api.get(`/admin/users/${row.id}`);
-      setSelected(res.data);
+      setSelected(res.data.data);
     } catch (err) {
       setError(err.response?.data?.message || 'Could not load user details');
     }

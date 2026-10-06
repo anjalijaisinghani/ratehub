@@ -1,3 +1,5 @@
+const AppError = require('./AppError');
+
 const { body, validationResult } = require('express-validator');
 
 // Rules from the requirements
@@ -32,19 +34,21 @@ const passwordRule = (field = 'password') =>
 const handleValidation = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({
-      message: errors.array()[0].msg,
-      errors: errors.array().map((e) => ({ field: e.path, message: e.msg })),
-    });
+    const list = errors.array().map((e) => ({ field: e.path, message: e.msg }));
+    return next(AppError.badRequest(list[0].message, 'VALIDATION_ERROR', list));
   }
   next();
 };
+
+// Login only needs "a password was typed". Strength rules apply when it is created.
+const loginPasswordRule = body('password').notEmpty().withMessage('Password is required');
 
 // Role must be one of the three allowed values
 const roleRule = body('role')
   .isIn(['ADMIN', 'USER', 'OWNER'])
   .withMessage('Role must be ADMIN, USER or OWNER');
 
+  
 // Store name: required, max 255 characters
 const storeNameRule = body('name')
   .trim()
@@ -66,6 +70,7 @@ module.exports = {
   emailRule,
   addressRule,
   passwordRule,
+  loginPasswordRule,
   roleRule,
   storeNameRule,
   ownerIdRule,

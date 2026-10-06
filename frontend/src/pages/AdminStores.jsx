@@ -16,7 +16,7 @@ export default function AdminStores() {
       setLoading(true);
       try {
         const res = await api.get('/admin/stores', { params: { ...filters, sortBy, order } });
-        setStores(res.data);
+        setStores(res.data.data);
         setError('');
       } catch (err) {
         setError(err.response?.data?.message || 'Could not load stores');

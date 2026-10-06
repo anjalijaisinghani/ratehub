@@ -19,7 +19,7 @@ export default function OwnerDashboard() {
     const load = async () => {
       try {
         const res = await api.get('/owner/dashboard', { params: { sortBy, order } });
-        setData(res.data);
+        setData(res.data.data);
         setError('');
       } catch (err) {
         setError(err.response?.data?.message || 'Could not load dashboard');
