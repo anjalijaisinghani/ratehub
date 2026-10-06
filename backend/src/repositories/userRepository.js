@@ -31,8 +31,38 @@ const create = async ({ name, email, passwordHash, address, role }) => {
   return result.insertId;
 };
 
-const updatePassword = async (id, passwordHash) => {
-  await db.query('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, id]);
+const updatePassword = async (id, passwordHash, now = new Date()) => {
+  await db.query('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?', [
+    passwordHash,
+    now,
+    id,
+  ]);
+};
+
+// Login worked: remember when, and forget earlier failures
+const recordSuccessfulLogin = async (id, now) => {
+  await db.query(
+    'UPDATE users SET last_login_at = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?',
+    [now, id]
+  );
+};
+
+// Login failed. One atomic statement: count the failure and lock the account when
+// the limit is reached. (MySQL evaluates the assignments left to right, so locked_until
+// still sees the OLD counter, which is why we compare "+ 1".)
+const registerFailedLogin = async (id, maxAttempts, lockUntil) => {
+  await db.query(
+    `UPDATE users
+        SET locked_until = IF(failed_login_attempts + 1 >= ?, ?, locked_until),
+            failed_login_attempts = failed_login_attempts + 1
+      WHERE id = ?`,
+    [maxAttempts, lockUntil, id]
+  );
+};
+
+// The lock time has passed: start fresh
+const clearLock = async (id) => {
+  await db.query('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?', [id]);
 };
 
 // Filters arrive already cleaned by the service
@@ -54,4 +84,14 @@ const list = async ({ name, email, address, role, sortBy, order }) => {
   return rows;
 };
 
-module.exports = { findByEmail, findById, findPublicById, create, updatePassword, list };
+module.exports = {
+  findByEmail,
+  findById,
+  findPublicById,
+  create,
+  updatePassword,
+  recordSuccessfulLogin,
+  registerFailedLogin,
+  clearLock,
+  list,
+};

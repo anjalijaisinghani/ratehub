@@ -3,6 +3,7 @@ const request = require('supertest');
 const db = require('../../src/config/db');
 
 const PASSWORD = 'Test@1234';
+const COOKIE_NAME = 'rh_refresh';
 
 // Safety net: tests delete data, so they must NEVER run against a real database
 const assertTestDatabase = () => {
@@ -14,6 +15,7 @@ const assertTestDatabase = () => {
 // Empty all tables (children first, because of foreign keys)
 const resetDb = async () => {
   assertTestDatabase();
+  await db.query('DELETE FROM refresh_tokens');
   await db.query('DELETE FROM ratings');
   await db.query('DELETE FROM stores');
   await db.query('DELETE FROM users');
@@ -48,15 +50,34 @@ const createStore = async ({ ownerId, label = 'Fresh' }) => {
   return { id: result.insertId, name, ownerId };
 };
 
-// Logs in through the REAL API and returns the token
+// Pulls "rh_refresh=<value>" out of a response's Set-Cookie header
+const getRefreshCookie = (res) => {
+  const raw = (res.headers['set-cookie'] || []).find((c) => c.startsWith(`${COOKIE_NAME}=`));
+  return raw ? raw.split(';')[0] : null;
+};
+
+// Logs in through the REAL API. Returns the access token AND the refresh cookie.
+const loginFull = async (app, user, password = user.password) => {
+  const res = await request(app).post('/api/v1/auth/login').send({ email: user.email, password });
+  return { res, accessToken: res.body?.data?.accessToken, cookie: getRefreshCookie(res) };
+};
+
 const loginAs = async (app, user) => {
-  const res = await request(app)
-    .post('/api/v1/auth/login')
-    .send({ email: user.email, password: user.password });
+  const { res, accessToken } = await loginFull(app, user);
   if (res.status !== 200) throw new Error(`Test login failed for ${user.email}: ${res.status}`);
-  return res.body.data.token;
+  return accessToken;
 };
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
 
-module.exports = { PASSWORD, resetDb, closeDb, createUser, createStore, loginAs, auth };
+module.exports = {
+  PASSWORD,
+  resetDb,
+  closeDb,
+  createUser,
+  createStore,
+  loginAs,
+  loginFull,
+  getRefreshCookie,
+  auth,
+};

@@ -36,7 +36,16 @@ const UserOnly = ({ children }) => <ProtectedRoute roles={['USER']}>{children}</
 const OwnerOnly = ({ children }) => <ProtectedRoute roles={['OWNER']}>{children}</ProtectedRoute>;
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  // Wait until we know whether a session exists, so we don't flash the login page
+  if (loading) {
+    return (
+      <div className="container">
+        <p className="muted">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <>

@@ -12,7 +12,8 @@ const authenticate = (req, res, next) => {
   const token = header.split(' ')[1];
 
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET); // { id, role }
+        // Only accept the algorithm we signed with (blocks "alg" confusion attacks)
+    req.user = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }); // { id, role, sid }
     next();
   } catch (err) {
     const message = err.name === 'TokenExpiredError' ? 'Token has expired.' : 'Invalid token.';

@@ -60,7 +60,7 @@ describe('login and password change (real database)', () => {
     expect(login.status).toBe(200);
     expect(JSON.stringify(login.body)).not.toContain('password_hash');
 
-    const stores = await request(app).get('/api/v1/stores').set(auth(login.body.data.token));
+    const stores = await request(app).get('/api/v1/stores').set(auth(login.body.data.accessToken));
     expect(stores.status).toBe(200);
     expect(stores.body.data).toEqual([]);
   });
@@ -82,7 +82,7 @@ describe('login and password change (real database)', () => {
 
     const change = await request(app)
       .put('/api/v1/auth/change-password')
-      .set(auth(login.body.data.token))
+      .set(auth(login.body.data.accessToken))
       .send({ currentPassword: 'Rahul@1234', newPassword: 'Rahul@5678' });
     expect(change.status).toBe(200);
 

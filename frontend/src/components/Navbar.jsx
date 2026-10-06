@@ -10,7 +10,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     const yes = await confirmAction('Log out?', 'You will need to log in again.', 'Yes, log out');
     if (!yes) return;
-    logout();
+       await logout();
     navigate('/');
     toast('Logged out successfully');
   };

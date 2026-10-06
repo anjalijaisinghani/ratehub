@@ -1,6 +1,15 @@
 const express = require('express');
-const { signup, login, changePassword } = require('../controllers/authController');
+const {
+  signup,
+  login,
+  refresh,
+  logout,
+  logoutAll,
+  changePassword,
+} = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
+const { loginLimiter } = require('../middleware/rateLimiters');
+const { requireTrustedOrigin } = require('../middleware/origin');
 const {
   nameRule,
   emailRule,
@@ -18,9 +27,15 @@ router.post(
   signup
 );
 
-router.post('/login', [emailRule, loginPasswordRule, handleValidation], login);
+router.post('/login', loginLimiter, [emailRule, loginPasswordRule, handleValidation], login);
 
-// Protected: user must be logged in (token required)
+// Cookie-based: only from our own website
+router.post('/refresh', requireTrustedOrigin, refresh);
+router.post('/logout', requireTrustedOrigin, logout);
+
+// Needs a valid access token
+router.post('/logout-all', authenticate, logoutAll);
+
 router.put(
   '/change-password',
   [authenticate, passwordRule('newPassword'), handleValidation],

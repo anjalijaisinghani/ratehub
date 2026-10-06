@@ -25,8 +25,8 @@ export default function Login() {
 
     try {
       const res = await api.post('/auth/login', form);
-      const { token, user } = res.data.data;
-      login(token, user);
+            const { accessToken, user } = res.data.data;
+      login(accessToken, user);
       toast(`Welcome back, ${user.name.split(' ')[0]}!`);
       navigate('/');
     } catch (err) {
