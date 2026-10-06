@@ -1,0 +1,62 @@
+const bcrypt = require('bcryptjs');
+const request = require('supertest');
+const db = require('../../src/config/db');
+
+const PASSWORD = 'Test@1234';
+
+// Safety net: tests delete data, so they must NEVER run against a real database
+const assertTestDatabase = () => {
+  if (!/_test$/.test(process.env.DB_NAME || '')) {
+    throw new Error(`Refusing to run: "${process.env.DB_NAME}" is not a test database (name must end in _test)`);
+  }
+};
+
+// Empty all tables (children first, because of foreign keys)
+const resetDb = async () => {
+  assertTestDatabase();
+  await db.query('DELETE FROM ratings');
+  await db.query('DELETE FROM stores');
+  await db.query('DELETE FROM users');
+};
+
+const closeDb = () => db.end();
+
+let counter = 0;
+
+// Inserts a user directly (fast: low bcrypt cost, no HTTP)
+const createUser = async ({ label = 'User', role = 'USER', address = '1 Test Street, Pune' } = {}) => {
+  assertTestDatabase();
+  counter += 1;
+  const email = `${label.toLowerCase()}${counter}@example.com`;
+  const name = `${label} Integration Test Account`; // always 20+ characters
+  const hash = await bcrypt.hash(PASSWORD, 4);
+  const [result] = await db.query(
+    'INSERT INTO users (name, email, password_hash, address, role) VALUES (?, ?, ?, ?, ?)',
+    [name, email, hash, address, role]
+  );
+  return { id: result.insertId, name, email, address, role, password: PASSWORD };
+};
+
+const createStore = async ({ ownerId, label = 'Fresh' }) => {
+  assertTestDatabase();
+  counter += 1;
+  const name = `${label} Integration Test Store`;
+  const [result] = await db.query(
+    'INSERT INTO stores (name, email, address, owner_id) VALUES (?, ?, ?, ?)',
+    [name, `store${counter}@example.com`, '78 Station Road, Pune', ownerId]
+  );
+  return { id: result.insertId, name, ownerId };
+};
+
+// Logs in through the REAL API and returns the token
+const loginAs = async (app, user) => {
+  const res = await request(app)
+    .post('/api/v1/auth/login')
+    .send({ email: user.email, password: user.password });
+  if (res.status !== 200) throw new Error(`Test login failed for ${user.email}: ${res.status}`);
+  return res.body.data.token;
+};
+
+const auth = (token) => ({ Authorization: `Bearer ${token}` });
+
+module.exports = { PASSWORD, resetDb, closeDb, createUser, createStore, loginAs, auth };

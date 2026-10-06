@@ -1,7 +1,9 @@
 const analyticsRepository = require('../repositories/analyticsRepository');
 
 const pad = (n) => String(n).padStart(2, '0');
-const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+// Days are calculated in UTC, to match the database (which stores UTC).
+const dayKey = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 
 // Pure function (no database): turns raw rows into the shape the charts need.
 // "now" can be passed in, which makes it easy to test.
@@ -16,7 +18,7 @@ const buildAdminAnalytics = (raw, now = new Date()) => {
   const activity = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
-    d.setDate(d.getDate() - i);
+    d.setUTCDate(d.getUTCDate() - i);
     const key = dayKey(d);
     activity.push({
       day: key,

@@ -14,7 +14,7 @@ const emptyRaw = {
 };
 
 // A fixed date, so the test gives the same result every day
-const now = new Date(2026, 9, 6); // 6 October 2026
+const now = new Date(Date.UTC(2026, 9, 6, 12, 0, 0)); // 6 October 2026, noon UTC
 
 describe('buildAdminAnalytics', () => {
   test('rating distribution always has all 5 stars, zero-filled', () => {
