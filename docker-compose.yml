@@ -20,5 +20,13 @@ services:
       timeout: 5s
       retries: 20
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ratehub-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # the fake inbox in your browser
+      - "1025:1025"   # SMTP: where the backend sends mail
+
 volumes:
   mysql_data:

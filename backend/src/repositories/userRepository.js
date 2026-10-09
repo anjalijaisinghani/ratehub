@@ -23,14 +23,22 @@ const findPublicById = async (id) => {
 };
 
 // Returns the id of the new row
-const create = async ({ name, email, passwordHash, address, role }) => {
+const create = async ({
+  name,
+  email,
+  passwordHash,
+  address,
+  role,
+  status = 'ACTIVE',
+  emailVerifiedAt = null,
+}) => {
   const [result] = await db.query(
-    'INSERT INTO users (name, email, password_hash, address, role) VALUES (?, ?, ?, ?, ?)',
-    [name, email, passwordHash, address, role]
+    `INSERT INTO users (name, email, password_hash, address, role, status, email_verified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [name, email, passwordHash, address, role, status, emailVerifiedAt]
   );
   return result.insertId;
 };
-
 const updatePassword = async (id, passwordHash, now = new Date()) => {
   await db.query('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?', [
     passwordHash,
@@ -65,6 +73,34 @@ const clearLock = async (id) => {
   await db.query('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?', [id]);
 };
 
+// Email confirmed: remember when, and activate accounts that were waiting (PENDING).
+// A SUSPENDED account stays suspended.
+const markEmailVerified = async (id, now) => {
+  await db.query(
+    `UPDATE users
+        SET email_verified_at = COALESCE(email_verified_at, ?),
+            status = IF(status = 'PENDING', 'ACTIVE', status)
+      WHERE id = ?`,
+    [now, id]
+  );
+};
+
+// Password reset by email: new password, forget failed attempts and any lock.
+// Being able to read the email also proves the address is real, so PENDING becomes ACTIVE.
+const resetPassword = async (id, passwordHash, now) => {
+  await db.query(
+    `UPDATE users
+        SET password_hash = ?,
+            password_changed_at = ?,
+            failed_login_attempts = 0,
+            locked_until = NULL,
+            email_verified_at = COALESCE(email_verified_at, ?),
+            status = IF(status = 'PENDING', 'ACTIVE', status)
+      WHERE id = ?`,
+    [passwordHash, now, now, id]
+  );
+};
+
 // Filters arrive already cleaned by the service
 const list = async ({ name, email, address, role, sortBy, order }) => {
   const { column, direction } = resolveSort(sortBy, order, SORT_COLUMNS, 'name');
@@ -93,5 +129,7 @@ module.exports = {
   recordSuccessfulLogin,
   registerFailedLogin,
   clearLock,
+  markEmailVerified,
+  resetPassword,
   list,
 };

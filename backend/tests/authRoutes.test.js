@@ -4,10 +4,12 @@ const jwt = require('jsonwebtoken');
 
 jest.mock('../src/repositories/userRepository');
 jest.mock('../src/repositories/refreshTokenRepository');
+jest.mock('../src/services/accountService');
 
 const userRepository = require('../src/repositories/userRepository');
 const refreshTokenRepository = require('../src/repositories/refreshTokenRepository');
 const app = require('../src/app');
+const accountService = require('../src/services/accountService');
 
 const validSignup = {
   name: 'Rahul Sharma Test User One',
@@ -191,5 +193,53 @@ describe('PUT /api/v1/auth/change-password', () => {
       expect.any(Date),
       'fam-9'
     );
+  });
+});
+
+
+describe('email verification and password reset routes', () => {
+  const goodToken = 'a'.repeat(64);
+
+  test('verify-email rejects a malformed token with 400', async () => {
+    const res = await request(app).post('/api/v1/auth/verify-email').send({ token: 'not-a-token' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+    expect(accountService.verifyEmail).not.toHaveBeenCalled();
+  });
+
+  test('verify-email with a well-formed token calls the service', async () => {
+    const res = await request(app).post('/api/v1/auth/verify-email').send({ token: goodToken });
+    expect(res.status).toBe(200);
+    expect(accountService.verifyEmail).toHaveBeenCalledWith(goodToken);
+  });
+
+  test('resend-verification with an invalid email is 400', async () => {
+    const res = await request(app).post('/api/v1/auth/resend-verification').send({ email: 'nope' });
+    expect(res.status).toBe(400);
+    expect(accountService.resendVerification).not.toHaveBeenCalled();
+  });
+
+  test('forgot-password always answers 200 with the generic message', async () => {
+    const res = await request(app).post('/api/v1/auth/forgot-password').send({ email: 'anyone@example.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toMatch(/^If an account exists/);
+    expect(accountService.forgotPassword).toHaveBeenCalledWith('anyone@example.com');
+  });
+
+  test('reset-password with a weak password is 400 and never reaches the service', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: goodToken, newPassword: 'weakpass' });
+    expect(res.status).toBe(400);
+    expect(accountService.resetPassword).not.toHaveBeenCalled();
+  });
+
+  test('reset-password with valid input calls the service', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: goodToken, newPassword: 'Brand@New99' });
+    expect(res.status).toBe(200);
+    expect(accountService.resetPassword).toHaveBeenCalledWith(goodToken, 'Brand@New99');
   });
 });

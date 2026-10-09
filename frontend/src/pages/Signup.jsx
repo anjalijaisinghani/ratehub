@@ -30,7 +30,10 @@ export default function Signup() {
 
     try {
       await api.post('/auth/signup', form);
-      await showSuccess('Account created!', 'Please log in to continue.');
+      await showSuccess(
+        'Almost there!',
+        'We sent a verification link to your email. Click it to activate your account, then log in.'
+      );
       navigate('/login');
     } catch (err) {
       showError(err.response?.data?.message || 'Could not connect to server');

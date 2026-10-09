@@ -54,7 +54,7 @@ const runMigrations = async ({ log = console.log } = {}) => {
 
 // Runs when you type: npm run migrate
 if (require.main === module) {
-  require('dotenv').config();
+  require('dotenv').config({ quiet: true });
   runMigrations()
     .then(() => process.exit(0))
     .catch((err) => {

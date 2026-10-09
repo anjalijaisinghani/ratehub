@@ -43,6 +43,14 @@ const handleValidation = (req, res, next) => {
 // Login only needs "a password was typed". Strength rules apply when it is created.
 const loginPasswordRule = body('password').notEmpty().withMessage('Password is required');
 
+// The token in an emailed link: exactly 64 hex characters
+const tokenRule = body('token')
+  .isString()
+  .withMessage('Token is required')
+  .bail()
+  .matches(/^[0-9a-f]{64}$/)
+  .withMessage('This link is invalid');
+
 // Role must be one of the three allowed values
 const roleRule = body('role')
   .isIn(['ADMIN', 'USER', 'OWNER'])
@@ -71,6 +79,7 @@ module.exports = {
   addressRule,
   passwordRule,
   loginPasswordRule,
+  tokenRule,
   roleRule,
   storeNameRule,
   ownerIdRule,

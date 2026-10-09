@@ -17,6 +17,10 @@ const generateRefreshToken = () => crypto.randomBytes(48).toString('hex');
 // Passwords are different: they are short and guessable, so they need bcrypt.)
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
+
+// The random part of an emailed link (verify email / reset password). 32 bytes = 64 hex characters.
+const generateUrlToken = () => crypto.randomBytes(32).toString('hex');
+
 const refreshExpiry = () => new Date(Date.now() + config.refreshTokenDays * 24 * 60 * 60 * 1000);
 
-module.exports = { createAccessToken, generateRefreshToken, hashToken, refreshExpiry };
+module.exports = { createAccessToken, generateRefreshToken, generateUrlToken, hashToken, refreshExpiry };

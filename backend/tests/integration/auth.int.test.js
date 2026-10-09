@@ -1,7 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/config/db');
-const { resetDb, closeDb, auth } = require('../helpers/db');
+const { resetDb, closeDb, auth, mailsTo, tokenFromMail } = require('../helpers/db');
 
 beforeEach(resetDb);
 afterAll(closeDb);
@@ -16,6 +16,13 @@ const signupBody = (email = 'rahul@example.com') => ({
 const dbUser = async (email) => {
   const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
   return rows[0];
+};
+
+// Signs up AND clicks the emailed link, like a real user would
+const signupAndVerify = async (email = 'rahul@example.com') => {
+  await request(app).post('/api/v1/auth/signup').send(signupBody(email));
+  const token = tokenFromMail(mailsTo(email)[0]);
+  await request(app).post('/api/v1/auth/verify-email').send({ token });
 };
 
 describe('signup (real database)', () => {
@@ -51,8 +58,8 @@ describe('signup (real database)', () => {
 });
 
 describe('login and password change (real database)', () => {
-  test('signup then login returns a token that opens a protected route', async () => {
-    await request(app).post('/api/v1/auth/signup').send(signupBody());
+  test('signup, verify, then login returns a token that opens a protected route', async () => {
+    await signupAndVerify();
 
     const login = await request(app)
       .post('/api/v1/auth/login')
@@ -66,7 +73,7 @@ describe('login and password change (real database)', () => {
   });
 
   test('wrong password gives 401 INVALID_CREDENTIALS', async () => {
-    await request(app).post('/api/v1/auth/signup').send(signupBody());
+    await signupAndVerify();
     const res = await request(app)
       .post('/api/v1/auth/login')
       .send({ email: 'rahul@example.com', password: 'Wrong@1234' });
@@ -75,7 +82,7 @@ describe('login and password change (real database)', () => {
   });
 
   test('after changing the password, the old one stops working and the new one works', async () => {
-    await request(app).post('/api/v1/auth/signup').send(signupBody());
+    await signupAndVerify();
     const login = await request(app)
       .post('/api/v1/auth/login')
       .send({ email: 'rahul@example.com', password: 'Rahul@1234' });

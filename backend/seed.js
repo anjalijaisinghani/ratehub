@@ -1,5 +1,5 @@
 // Creates the default admin account (safe to run more than once)
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const bcrypt = require('bcryptjs');
 const db = require('./src/config/db');
 
@@ -19,8 +19,8 @@ async function seed() {
     } else {
       const hash = await bcrypt.hash(ADMIN.password, 10);
       await db.query(
-        'INSERT INTO users (name, email, password_hash, address, role) VALUES (?, ?, ?, ?, ?)',
-        [ADMIN.name, ADMIN.email, hash, ADMIN.address, 'ADMIN']
+        'INSERT INTO users (name, email, password_hash, address, role, email_verified_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [ADMIN.name, ADMIN.email, hash, ADMIN.address, 'ADMIN', new Date()]
       );
       console.log(`Admin created: ${ADMIN.email} / ${ADMIN.password}`);
     }

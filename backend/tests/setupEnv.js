@@ -1,7 +1,7 @@
 const path = require('path');
 
 // Load DB host, port and credentials from backend/.env
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
 // Test-only settings. They override .env so tests behave the same on every machine.
 process.env.NODE_ENV = 'test';
@@ -13,6 +13,9 @@ process.env.COOKIE_SECURE = 'false';
 process.env.COOKIE_SAMESITE = 'strict';
 process.env.MAX_FAILED_LOGINS = '5';
 process.env.LOCK_MINUTES = '15';
+process.env.APP_URL = 'http://localhost:5173';
+process.env.VERIFY_TOKEN_HOURS = '24';
+process.env.RESET_TOKEN_MINUTES = '60';
 
 // Tests ALWAYS use the separate test database, never your real data
 process.env.DB_NAME = 'store_rating_test';

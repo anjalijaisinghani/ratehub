@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const { assertSecureConfig } = require('./config/security');
 assertSecureConfig(); // stop immediately if the secret is missing or unsafe

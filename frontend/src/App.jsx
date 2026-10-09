@@ -14,6 +14,10 @@ import AddUser from './pages/AddUser.jsx';
 import AddStore from './pages/AddStore.jsx';
 import UserStores from './pages/UserStores.jsx';
 import OwnerDashboard from './pages/OwnerDashboard.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
+
 
 // "/" shows the landing page to visitors, and sends logged-in users to their own home
 function Home() {
@@ -55,6 +59,11 @@ export default function App() {
         <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
         <Route path="/signup" element={<PublicOnly><Signup /></PublicOnly>} />
 
+                {/* Opened from emails: these must work whether or not someone is logged in */}
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        
         <Route path="/admin" element={<AdminOnly><AdminDashboard /></AdminOnly>} />
         <Route path="/admin/users" element={<AdminOnly><AdminUsers /></AdminOnly>} />
         <Route path="/admin/stores" element={<AdminOnly><AdminStores /></AdminOnly>} />

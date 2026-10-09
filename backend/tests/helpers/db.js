@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const request = require('supertest');
 const db = require('../../src/config/db');
+const mailService = require('../../src/services/mailService');
 
 const PASSWORD = 'Test@1234';
 const COOKIE_NAME = 'rh_refresh';
@@ -12,20 +13,22 @@ const assertTestDatabase = () => {
   }
 };
 
-// Empty all tables (children first, because of foreign keys)
+// Empty all tables (children first, because of foreign keys) and the fake mailbox
 const resetDb = async () => {
   assertTestDatabase();
+  await db.query('DELETE FROM auth_tokens');
   await db.query('DELETE FROM refresh_tokens');
   await db.query('DELETE FROM ratings');
   await db.query('DELETE FROM stores');
   await db.query('DELETE FROM users');
+  mailService.clearOutbox();
 };
 
 const closeDb = () => db.end();
 
 let counter = 0;
 
-// Inserts a user directly (fast: low bcrypt cost, no HTTP)
+// Inserts an ACTIVE, verified user directly (fast: low bcrypt cost, no HTTP)
 const createUser = async ({ label = 'User', role = 'USER', address = '1 Test Street, Pune' } = {}) => {
   assertTestDatabase();
   counter += 1;
@@ -33,8 +36,8 @@ const createUser = async ({ label = 'User', role = 'USER', address = '1 Test Str
   const name = `${label} Integration Test Account`; // always 20+ characters
   const hash = await bcrypt.hash(PASSWORD, 4);
   const [result] = await db.query(
-    'INSERT INTO users (name, email, password_hash, address, role) VALUES (?, ?, ?, ?, ?)',
-    [name, email, hash, address, role]
+    'INSERT INTO users (name, email, password_hash, address, role, email_verified_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [name, email, hash, address, role, new Date()]
   );
   return { id: result.insertId, name, email, address, role, password: PASSWORD };
 };
@@ -70,6 +73,14 @@ const loginAs = async (app, user) => {
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
 
+// ----- Fake mailbox helpers -----
+const mailsTo = (email) => mailService.outbox.filter((m) => m.to === email);
+const tokenFromMail = (mail) => mail.text.match(/token=([0-9a-f]{64})/)[1];
+
+// Pretend the emailed links were created `seconds` ago (to get past the cooldown)
+const ageTokens = (seconds) =>
+  db.query('UPDATE auth_tokens SET created_at = ?', [new Date(Date.now() - seconds * 1000)]);
+
 module.exports = {
   PASSWORD,
   resetDb,
@@ -80,4 +91,7 @@ module.exports = {
   loginFull,
   getRefreshCookie,
   auth,
+  mailsTo,
+  tokenFromMail,
+  ageTokens,
 };

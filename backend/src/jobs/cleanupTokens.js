@@ -1,12 +1,17 @@
 const refreshTokenRepository = require('../repositories/refreshTokenRepository');
+const authTokenRepository = require('../repositories/authTokenRepository');
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
-// Deletes refresh tokens that have expired
+// Deletes tokens that have expired (refresh tokens and emailed links)
 const run = async () => {
   try {
-    const removed = await refreshTokenRepository.deleteExpired(new Date());
-    if (removed > 0) console.log(`Cleanup: removed ${removed} expired refresh token(s)`);
+    const now = new Date();
+    const sessions = await refreshTokenRepository.deleteExpired(now);
+    const links = await authTokenRepository.deleteExpired(now);
+    if (sessions + links > 0) {
+      console.log(`Cleanup: removed ${sessions} expired session token(s) and ${links} expired email link(s)`);
+    }
   } catch (err) {
     console.error('Token cleanup failed:', err.message);
   }

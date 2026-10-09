@@ -6,9 +6,17 @@ const {
   logout,
   logoutAll,
   changePassword,
+  verifyEmail,
+  resendVerification,
+  forgotPassword,
+  resetPassword,
 } = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
-const { loginLimiter } = require('../middleware/rateLimiters');
+const {
+  loginLimiter,
+  forgotPasswordLimiter,
+  resendVerificationLimiter,
+} = require('../middleware/rateLimiters');
 const { requireTrustedOrigin } = require('../middleware/origin');
 const {
   nameRule,
@@ -16,6 +24,7 @@ const {
   addressRule,
   passwordRule,
   loginPasswordRule,
+  tokenRule,
   handleValidation,
 } = require('../utils/validators');
 
@@ -40,6 +49,23 @@ router.put(
   '/change-password',
   [authenticate, passwordRule('newPassword'), handleValidation],
   changePassword
+);
+
+// ----- Email verification -----
+router.post('/verify-email', [tokenRule, handleValidation], verifyEmail);
+router.post(
+  '/resend-verification',
+  resendVerificationLimiter,
+  [emailRule, handleValidation],
+  resendVerification
+);
+
+// ----- Forgot / reset password -----
+router.post('/forgot-password', forgotPasswordLimiter, [emailRule, handleValidation], forgotPassword);
+router.post(
+  '/reset-password',
+  [tokenRule, passwordRule('newPassword'), handleValidation],
+  resetPassword
 );
 
 module.exports = router;

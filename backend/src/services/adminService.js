@@ -17,7 +17,15 @@ const addUser = async ({ name, email, address, password, role }) => {
   }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-  const id = await userRepository.create({ name, email, address, passwordHash, role });
+  // The admin vouches for these accounts, so they are active and verified immediately
+  const id = await userRepository.create({
+    name,
+    email,
+    address,
+    passwordHash,
+    role,
+    emailVerifiedAt: new Date(),
+  });
 
   return { id, name, email, address, role };
 };

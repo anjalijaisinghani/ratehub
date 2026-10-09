@@ -271,3 +271,9 @@ button.small { padding: 6px 12px; margin-top: 0; font-size: 13px; }
 .activity-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .activity-item:last-child { border-bottom: none; }
 .activity-item small { color: var(--muted); display: block; }
+
+
+/* ----- Email pages ----- */
+.center { text-align: center; }
+.big-icon { font-size: 54px; margin-bottom: 6px; }
+button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }

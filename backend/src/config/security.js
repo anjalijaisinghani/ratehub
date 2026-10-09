@@ -36,6 +36,7 @@ const config = {
     enabled: process.env.RATE_LIMIT_ENABLED !== 'false' && !isTest,
     general: { windowMs: 15 * 60 * 1000, limit: num(process.env.RATE_LIMIT_GENERAL, 600) },
     login: { windowMs: 15 * 60 * 1000, limit: num(process.env.RATE_LIMIT_LOGIN, 5) },
+        passwordReset: { windowMs: 60 * 60 * 1000, limit: num(process.env.RATE_LIMIT_PASSWORD_RESET, 3) },
   },
 };
 

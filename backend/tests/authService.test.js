@@ -3,10 +3,13 @@ const jwt = require('jsonwebtoken');
 
 jest.mock('../src/repositories/userRepository');
 jest.mock('../src/repositories/refreshTokenRepository');
+jest.mock('../src/services/accountService'); // emails are tested in accountService.test.js
+
 
 const userRepository = require('../src/repositories/userRepository');
 const refreshTokenRepository = require('../src/repositories/refreshTokenRepository');
 const authService = require('../src/services/authService');
+const accountService = require('../src/services/accountService');
 const tokenService = require('../src/services/tokenService');
 const config = require('../src/config/security');
 
@@ -43,6 +46,25 @@ const tokenRow = (overrides = {}) => ({
 beforeEach(() => jest.resetAllMocks());
 
 describe('signup', () => {
+    test('self-signup creates a PENDING account and sends the verification email', async () => {
+    userRepository.findByEmail.mockResolvedValue(null);
+    userRepository.create.mockResolvedValue(7);
+
+    await authService.signup(signupInput);
+
+    expect(userRepository.create.mock.calls[0][0].status).toBe('PENDING');
+    expect(accountService.sendVerificationEmail).toHaveBeenCalledWith({
+      id: 7,
+      name: signupInput.name,
+      email: signupInput.email,
+    });
+  });
+
+  test('a duplicate signup sends no email', async () => {
+    userRepository.findByEmail.mockResolvedValue({ id: 1 });
+    await expect(authService.signup(signupInput)).rejects.toMatchObject({ statusCode: 409 });
+    expect(accountService.sendVerificationEmail).not.toHaveBeenCalled();
+  });
   test('creates a USER and stores a hashed password', async () => {
     userRepository.findByEmail.mockResolvedValue(null);
     userRepository.create.mockResolvedValue(7);

@@ -31,4 +31,22 @@ const loginLimiter = createLimiter({
   message: 'Too many failed login attempts. Please try again in 15 minutes.',
 });
 
-module.exports = { createLimiter, generalLimiter, loginLimiter };
+// Forgot-password and resend-verification send emails, so each gets its own tight limit.
+// (They have separate counters, so using one never blocks the other.)
+const forgotPasswordLimiter = createLimiter({
+  ...config.rateLimit.passwordReset,
+  message: 'Too many password reset requests. Please try again in an hour.',
+});
+
+const resendVerificationLimiter = createLimiter({
+  ...config.rateLimit.passwordReset,
+  message: 'Too many verification email requests. Please try again in an hour.',
+});
+
+module.exports = {
+  createLimiter,
+  generalLimiter,
+  loginLimiter,
+  forgotPasswordLimiter,
+  resendVerificationLimiter,
+};

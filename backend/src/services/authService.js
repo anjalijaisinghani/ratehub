@@ -8,7 +8,7 @@ const USER_STATUS = require('../constants/userStatus');
 const userRepository = require('../repositories/userRepository');
 const refreshTokenRepository = require('../repositories/refreshTokenRepository');
 const tokenService = require('./tokenService');
-
+const accountService = require('./accountService');
 // Used when the email doesn't exist, so "unknown email" takes as long as
 // "wrong password". This stops attackers from discovering which emails exist by timing.
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', BCRYPT_ROUNDS);
@@ -37,6 +37,7 @@ const createSession = async (user, meta = {}, familyId = crypto.randomUUID()) =>
 };
 
 // ---------- Signup (normal users only) ----------
+// The account starts as PENDING. It becomes ACTIVE when the emailed link is clicked.
 const signup = async ({ name, email, address, password }) => {
   const existing = await userRepository.findByEmail(email);
   if (existing) {
@@ -52,11 +53,13 @@ const signup = async ({ name, email, address, password }) => {
     address,
     passwordHash,
     role: ROLES.USER,
+    status: USER_STATUS.PENDING,
   });
+
+  await accountService.sendVerificationEmail({ id, name, email });
 
   return toPublicUser({ id, name, email, address, role: ROLES.USER });
 };
-
 // ---------- Login (all roles) ----------
 const login = async ({ email, password }, meta = {}) => {
   const now = new Date();
