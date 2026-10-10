@@ -129,3 +129,15 @@ describe('store profile constraints (migration 006)', () => {
     expect(values).toEqual(STORE_CATEGORIES);
   });
 });
+
+
+describe('location index (migration 007)', () => {
+  test('stores has an index on latitude and longitude', async () => {
+    const [rows] = await db.query(
+      `SELECT COLUMN_NAME AS col FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stores' AND INDEX_NAME = 'idx_stores_lat_lng'
+        ORDER BY SEQ_IN_INDEX`
+    );
+    expect(rows.map((r) => r.col)).toEqual(['latitude', 'longitude']);
+  });
+});

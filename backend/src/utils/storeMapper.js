@@ -25,6 +25,7 @@ const baseProfile = (r) => ({
 const toPublicStore = (r) => ({
   ...baseProfile(r),
   isOpenNow: toBool(r.isOpenNow), // null when the store has no opening hours
+    distanceKm: num(r.distanceKm), // null when no location was sent, or the store has no coordinates
   overallRating: num(r.overallRating),
   ratingCount: Number(r.ratingCount),
   myRating: r.myRating ?? null,

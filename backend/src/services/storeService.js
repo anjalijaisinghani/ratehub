@@ -3,16 +3,21 @@ const { cleanString } = require('../utils/sql');
 const { parsePagination, buildPagination } = require('../utils/pagination');
 const { parseId } = require('../utils/ids');
 const { nowTimeInZone } = require('../utils/time');
+const { parseLocation } = require('../utils/geo');
 const { toPublicStore } = require('../utils/storeMapper');
 const { STORE_CATEGORIES, STORE_STATUS } = require('../constants/storeCategories');
 const appConfig = require('../config/app');
 const storeRepository = require('../repositories/storeRepository');
 const ratingRepository = require('../repositories/ratingRepository');
 
+const DEFAULT_NEARBY_RADIUS_KM = 5;
+
 const isTrue = (v) => v === 'true' || v === '1';
 
-// Store discovery: search + filters + sorting + pages
-const listForUser = async (userId, query) => {
+// Store discovery: search + filters + sorting + pages.
+// With { nearby: true } a location is required, the radius defaults to 5 km,
+// and the stores are sorted nearest first.
+const listForUser = async (userId, query, { nearby = false } = {}) => {
   const { page, limit, offset } = parsePagination(query);
 
   const category = cleanString(query.category).toUpperCase();
@@ -30,6 +35,17 @@ const listForUser = async (userId, query) => {
     minRating = n;
   }
 
+  const location = parseLocation(query, {
+    required: nearby,
+    defaultRadiusKm: nearby ? DEFAULT_NEARBY_RADIUS_KM : null,
+  });
+
+  const sortBy = nearby && !query.sortBy ? 'distance' : query.sortBy;
+  const order = nearby && !query.order ? 'asc' : query.order;
+  if (sortBy === 'distance' && !location) {
+    throw AppError.badRequest('Sorting by distance needs your location (lat and lng)', 'LOCATION_REQUIRED');
+  }
+
   const filters = {
     name: cleanString(query.name),
     address: cleanString(query.address),
@@ -38,18 +54,21 @@ const listForUser = async (userId, query) => {
     category,
     minRating,
     openNow: isTrue(cleanString(query.openNow)),
+    location,
   };
 
   const nowTime = nowTimeInZone(appConfig.timezone);
   const { rows, total } = await storeRepository.listForUser(
     userId,
     filters,
-    { sortBy: query.sortBy, order: query.order, limit, offset },
+    { sortBy, order, limit, offset },
     nowTime
   );
 
   return { items: rows.map(toPublicStore), pagination: buildPagination(page, limit, total) };
 };
+
+const listNearby = (userId, query) => listForUser(userId, query, { nearby: true });
 
 // Submit a new rating, or modify the existing one (one rating per user per store)
 const submitRating = async (userId, storeId, rating) => {
@@ -68,4 +87,4 @@ const submitRating = async (userId, storeId, rating) => {
   return { storeId: id, rating };
 };
 
-module.exports = { listForUser, submitRating };
+module.exports = { listForUser, listNearby, submitRating };

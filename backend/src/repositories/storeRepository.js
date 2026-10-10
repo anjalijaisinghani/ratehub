@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { resolveSort, likePattern } = require('../utils/sql');
+const { boundingBox } = require('../utils/geo');
 
 // Average rating and number of ratings per store, calculated once in a sub-query
 const RATING_STATS = `
@@ -23,6 +24,16 @@ const OPEN_NOW_SQL = `(CASE
   END)`;
 const openNowParams = (time) => [time, time, time, time];
 
+// Straight-line ("as the crow flies") distance in km between the store and a point on the
+// globe: the Haversine formula. LEAST(1, ...) protects ASIN from tiny floating-point errors
+// that could push the value just above 1 (ASIN would then return NULL and drop the store).
+// Stores without coordinates give NULL. It has 3 placeholders: pass distanceParams(location).
+const DISTANCE_SQL = `(6371 * 2 * ASIN(SQRT(LEAST(1,
+    POWER(SIN(RADIANS(s.latitude - ?) / 2), 2)
+    + COS(RADIANS(?)) * COS(RADIANS(s.latitude)) * POWER(SIN(RADIANS(s.longitude - ?) / 2), 2)
+  ))))`;
+const distanceParams = ({ lat, lng }) => [lat, lat, lng];
+
 const PUBLIC_COLUMNS = `
   s.id, s.name, s.address, s.city, s.state, s.pincode, s.category, s.phone, s.website,
   s.image_url AS imageUrl, s.latitude, s.longitude,
@@ -38,6 +49,7 @@ const USER_SORT = {
   myRating: 'mine.rating',
   ratingCount: 'COALESCE(rs.rating_count, 0)',
   newest: 's.created_at',
+  distance: 'distanceKm', // the alias from the SELECT list
 };
 const ADMIN_SORT = {
   name: 's.name',
@@ -50,10 +62,11 @@ const ADMIN_SORT = {
   ratingCount: 'COALESCE(rs.rating_count, 0)',
   newest: 's.created_at',
 };
-// Unrated stores (NULL) always go to the END, in both directions
-const NULLABLE_SORTS = new Set(['overallRating', 'myRating', 'rating']);
+// Unrated stores (NULL) and stores without coordinates always go to the END, in both directions
+const NULLABLE_SORTS = new Set(['overallRating', 'myRating', 'rating', 'distance']);
 
 // Builds the WHERE part once. It is used by BOTH the page query and the count query.
+// Every ? is added to "params" in the same order as its clause, so the order always matches.
 const buildWhere = (f, nowTime, publicOnly) => {
   const clauses = [];
   const params = [];
@@ -89,6 +102,19 @@ const buildWhere = (f, nowTime, publicOnly) => {
   if (f.openNow) {
     clauses.push(`${OPEN_NOW_SQL} = 1`);
     params.push(...openNowParams(nowTime));
+  }
+
+  // Radius search, in two steps: 1) cheap box (can use the index), 2) exact distance
+  if (f.location && f.location.radiusKm) {
+    const { lat, lng, radiusKm } = f.location;
+    const box = boundingBox(lat, lng, radiusKm);
+    const lngSql = box.lngRanges.map(() => 's.longitude BETWEEN ? AND ?').join(' OR ');
+
+    clauses.push(`s.latitude BETWEEN ? AND ? AND (${lngSql})`);
+    params.push(box.minLat, box.maxLat, ...box.lngRanges.flat());
+
+    clauses.push(`${DISTANCE_SQL} <= ?`);
+    params.push(...distanceParams(f.location), radiusKm);
   }
 
   return { sql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
@@ -176,13 +202,20 @@ const listForAdmin = async (filters, { sortBy, order, limit, offset }) => {
 
 // Store discovery for a normal user: only ACTIVE stores, with the user's own rating.
 // "nowTime" (HH:MM:SS in the app timezone) is passed in, so tests can use any time of day.
+// filters.location = { lat, lng, radiusKm } is optional.
 const listForUser = async (userId, filters, { sortBy, order, limit, offset }, nowTime) => {
   const where = buildWhere(filters, nowTime, true);
+  const location = filters.location || null;
 
-  // Parameter order = the order the ? appear in the SQL text
+  const distanceSelect = location ? `ROUND(${DISTANCE_SQL}, 2)` : 'NULL';
+  const distanceSelectParams = location ? distanceParams(location) : [];
+
+  // Parameter order = the order the ? appear in the SQL text:
+  // SELECT (open-now, distance) -> JOIN (user id) -> WHERE -> LIMIT
   const [rows] = await db.query(
     `SELECT ${PUBLIC_COLUMNS},
             ${OPEN_NOW_SQL} AS isOpenNow,
+            ${distanceSelect} AS distanceKm,
             ROUND(rs.avg_rating, 1) AS overallRating,
             COALESCE(rs.rating_count, 0) AS ratingCount,
             mine.rating AS myRating
@@ -192,7 +225,7 @@ const listForUser = async (userId, filters, { sortBy, order, limit, offset }, no
        ${where.sql}
        ${buildOrderBy(sortBy, order, USER_SORT)}
        LIMIT ? OFFSET ?`,
-    [...openNowParams(nowTime), userId, ...where.params, limit, offset]
+    [...openNowParams(nowTime), ...distanceSelectParams, userId, ...where.params, limit, offset]
   );
   const [[{ total }]] = await db.query(
     `SELECT COUNT(*) AS total FROM stores s ${RATING_STATS} ${where.sql}`,

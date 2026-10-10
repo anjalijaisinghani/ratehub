@@ -27,6 +27,7 @@ const endpoints = [
   ['post', '/api/v1/admin/users', 'ADMIN'],
   ['post', '/api/v1/admin/stores', 'ADMIN'],
   ['get', '/api/v1/stores', 'USER'],
+    ['get', '/api/v1/stores/nearby', 'USER'],
   ['post', '/api/v1/stores/1/rating', 'USER'],
   ['get', '/api/v1/owner/dashboard', 'OWNER'],
 ];
@@ -37,7 +38,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   // the list controllers expect { items, pagination } from the service
   storeService.listForUser.mockResolvedValue(emptyPage);
+    storeService.listNearby.mockResolvedValue(emptyPage);
   adminService.listStores.mockResolvedValue(emptyPage);
+
 });
 
 describe.each(endpoints)('%s %s (only %s)', (method, url, allowedRole) => {

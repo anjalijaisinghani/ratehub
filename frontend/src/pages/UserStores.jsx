@@ -4,6 +4,7 @@ import Stars from '../components/Stars.jsx';
 import Pagination from '../components/Pagination.jsx';
 import useDebounce from '../utils/useDebounce.js';
 import { CATEGORIES, categoryOf, safeUrl } from '../utils/storeCategories.js';
+import { formatDistance, roundCoord } from '../utils/distance.js';
 import { askRating, toast, showError } from '../utils/alert.js';
 
 const PAGE_SIZE = 12;
@@ -16,12 +17,25 @@ const SORTS = [
   { value: 'newest:desc', label: 'Newest first' },
 ];
 
+const RADII = [
+  { value: '1', label: 'Within 1 km' },
+  { value: '2', label: 'Within 2 km' },
+  { value: '5', label: 'Within 5 km' },
+  { value: '10', label: 'Within 10 km' },
+  { value: '25', label: 'Within 25 km' },
+  { value: '50', label: 'Within 50 km' },
+  { value: '', label: 'Any distance' },
+];
+
 const emptyFilters = { search: '', category: '', city: '', minRating: '', openNow: false };
 
 export default function UserStores() {
   const [filters, setFilters] = useState(emptyFilters);
   const [sort, setSort] = useState('name:asc');
   const [page, setPage] = useState(1);
+  const [location, setLocation] = useState(null); // { lat, lng } while "Near me" is on
+  const [radius, setRadius] = useState('10');
+  const [locating, setLocating] = useState(false);
   const [result, setResult] = useState({ items: [], pagination: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,6 +54,11 @@ export default function UserStores() {
     if (debounced.city.trim()) params.city = debounced.city.trim();
     if (debounced.minRating) params.minRating = debounced.minRating;
     if (debounced.openNow) params.openNow = 'true';
+    if (location) {
+      params.lat = location.lat;
+      params.lng = location.lng;
+      if (radius) params.radius = radius;
+    }
 
     setLoading(true);
     api
@@ -59,12 +78,45 @@ export default function UserStores() {
     return () => {
       cancelled = true;
     };
-  }, [debounced, sort, page, refresh]);
+  }, [debounced, sort, page, refresh, location, radius]);
 
   // Any change in the filters starts again from page 1
   const updateFilter = (name, value) => {
     setFilters((f) => ({ ...f, [name]: value }));
     setPage(1);
+  };
+
+  // "Near me" button: turns location search on (asks the browser) or off
+  const handleNearMe = () => {
+    if (location) {
+      setLocation(null);
+      if (sort === 'distance:asc') setSort('name:asc');
+      setPage(1);
+      return;
+    }
+    if (!navigator.geolocation) {
+      showError('Your browser does not support location.');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({ lat: roundCoord(pos.coords.latitude), lng: roundCoord(pos.coords.longitude) });
+        setSort('distance:asc');
+        setPage(1);
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        showError(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission was denied. Allow location for this site in your browser settings to find nearby stores.'
+            : 'Could not get your location. Please try again.'
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+    );
   };
 
   const handleRate = async (store) => {
@@ -86,6 +138,7 @@ export default function UserStores() {
   };
 
   const hasFilters = JSON.stringify(filters) !== JSON.stringify(emptyFilters);
+  const sortOptions = location ? [{ value: 'distance:asc', label: 'Nearest first' }, ...SORTS] : SORTS;
   const { items, pagination } = result;
 
   return (
@@ -128,7 +181,7 @@ export default function UserStores() {
           <div>
             <label>Sort by</label>
             <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}>
-              {SORTS.map((s) => (
+              {sortOptions.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
@@ -144,10 +197,35 @@ export default function UserStores() {
             />
             Open now
           </label>
+
+          <button
+            type="button"
+            className={location ? 'small' : 'small secondary'}
+            style={{ marginTop: 0 }}
+            onClick={handleNearMe}
+            disabled={locating}
+          >
+            {locating ? 'Finding you...' : location ? '📍 Near me: ON (click to turn off)' : '📍 Near me'}
+          </button>
+
+          {location && (
+            <select value={radius} onChange={(e) => { setRadius(e.target.value); setPage(1); }}>
+              {RADII.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          )}
+
           {hasFilters && (
-            <button className="small secondary" onClick={clearFilters}>Clear filters</button>
+            <button className="small secondary" style={{ marginTop: 0 }} onClick={clearFilters}>Clear filters</button>
           )}
         </div>
+        {location && (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Using your approximate location (rounded to about 100 m, never saved). Stores without a map position are
+            hidden when a distance limit is set.
+          </p>
+        )}
       </div>
 
       {loading && items.length === 0 && <p className="muted">Loading stores...</p>}
@@ -156,7 +234,9 @@ export default function UserStores() {
         <div className="card empty-state">
           <div className="big-icon">🔎</div>
           <h3>No stores match your search</h3>
-          <p className="muted">Try different words or remove some filters.</p>
+          <p className="muted">
+            {location ? 'Try a bigger distance, or remove some filters.' : 'Try different words or remove some filters.'}
+          </p>
         </div>
       )}
 
@@ -165,6 +245,7 @@ export default function UserStores() {
           const cat = categoryOf(s.category);
           const image = s.imageUrl ? safeUrl(s.imageUrl) : null;
           const website = s.website ? safeUrl(s.website) : null;
+          const hasPosition = s.latitude !== null && s.longitude !== null;
 
           return (
             <div className="store-card" key={s.id}>
@@ -179,17 +260,29 @@ export default function UserStores() {
                 <h3>{s.name}</h3>
                 <div className="tag-row">
                   <span className="tag">{cat.icon} {cat.label}</span>
+                  {s.distanceKm !== null && <span className="tag near">📍 {formatDistance(s.distanceKm)} away</span>}
                   {s.isOpenNow === true && <span className="tag open">Open now</span>}
                   {s.isOpenNow === false && <span className="tag closed">Closed</span>}
                 </div>
                 <p className="muted">📍 {s.address}{s.city ? ` · ${s.city}` : ''}</p>
                 {s.openingTime && <p className="muted">🕒 {s.openingTime} – {s.closingTime}</p>}
                 {s.phone && <p className="muted">📞 {s.phone}</p>}
-                {website && (
-                  <p>
+                <p>
+                  {hasPosition && (
+                    <a
+                      className="link"
+                      href={`https://www.google.com/maps/search/?api=1&query=${s.latitude},${s.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Map ↗
+                    </a>
+                  )}
+                  {hasPosition && website && ' · '}
+                  {website && (
                     <a className="link" href={website} target="_blank" rel="noopener noreferrer">Website ↗</a>
-                  </p>
-                )}
+                  )}
+                </p>
                 <p>
                   <Stars value={s.overallRating} />
                   <span className="muted"> ({s.ratingCount} {s.ratingCount === 1 ? 'rating' : 'ratings'})</span>

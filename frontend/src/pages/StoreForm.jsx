@@ -68,6 +68,26 @@ export default function StoreForm() {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
+  // Fills latitude and longitude from the browser's location (best done while standing at the store)
+  const fillFromBrowserLocation = () => {
+    if (!navigator.geolocation) {
+      showError('Your browser does not support location.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm((f) => ({
+          ...f,
+          latitude: pos.coords.latitude.toFixed(6),
+          longitude: pos.coords.longitude.toFixed(6),
+        }));
+        toast('Location filled in');
+      },
+      () => showError('Could not get your location. Allow location access, or type the coordinates.'),
+      { timeout: 10000 }
+    );
+  };
+
   const validate = () => {
     const e = {
       name: validateName(form.name),
@@ -224,8 +244,10 @@ export default function StoreForm() {
             {field('Latitude (optional)', 'latitude', { placeholder: 'e.g. 18.5204' })}
             {field('Longitude (optional)', 'longitude', { placeholder: 'e.g. 73.8567' })}
           </div>
-          <p className="muted" style={{ marginBottom: 0 }}>
-            Opening and closing time equal means open 24 hours. A closing time earlier than the opening time means it closes after midnight.
+          <button type="button" className="secondary small" onClick={fillFromBrowserLocation}>
+            📍 Use my current location
+          </button>
+          <p className="muted" style={{ marginBottom: 0 }}>            Opening and closing time equal means open 24 hours. A closing time earlier than the opening time means it closes after midnight.
           </p>
 
           <label>Description (optional, max 1000 characters)</label>

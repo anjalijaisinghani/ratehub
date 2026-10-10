@@ -51,6 +51,8 @@ const createStore = async ({
   status = 'ACTIVE',
   openingTime = null,
   closingTime = null,
+  latitude = null,
+  longitude = null,
   createdAt = new Date(),
 }) => {
   assertTestDatabase();
@@ -58,11 +60,15 @@ const createStore = async ({
   const name = `${label} Integration Test Store`;
   const [result] = await db.query(
     `INSERT INTO stores
-       (name, email, address, owner_id, category, city, status, opening_time, closing_time, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, `store${counter}@example.com`, address, ownerId, category, city, status, openingTime, closingTime, createdAt]
+       (name, email, address, owner_id, category, city, status, opening_time, closing_time,
+        latitude, longitude, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      name, `store${counter}@example.com`, address, ownerId, category, city, status,
+      openingTime, closingTime, latitude, longitude, createdAt,
+    ]
   );
-  return { id: result.insertId, name, ownerId, category, city, status };
+  return { id: result.insertId, name, ownerId, category, city, status, latitude, longitude };
 };
 
 // Pulls "rh_refresh=<value>" out of a response's Set-Cookie header

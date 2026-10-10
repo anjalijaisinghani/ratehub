@@ -310,3 +310,8 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow
 
 .badge-ACTIVE { background: rgba(34, 197, 94, 0.18); color: #16a34a; }
 .badge-INACTIVE { background: rgba(107, 113, 148, 0.2); color: var(--muted); }
+
+
+/* ----- Near me ----- */
+.tag.near { background: rgba(30, 107, 255, 0.16); color: var(--blue); }
+.filter-actions select { width: auto; }
