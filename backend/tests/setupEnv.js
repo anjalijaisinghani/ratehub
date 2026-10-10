@@ -16,6 +16,7 @@ process.env.LOCK_MINUTES = '15';
 process.env.APP_URL = 'http://localhost:5173';
 process.env.VERIFY_TOKEN_HOURS = '24';
 process.env.RESET_TOKEN_MINUTES = '60';
+process.env.APP_TIMEZONE = 'Asia/Kolkata';
 
 // Tests ALWAYS use the separate test database, never your real data
 process.env.DB_NAME = 'store_rating_test';

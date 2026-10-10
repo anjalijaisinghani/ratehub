@@ -1,8 +1,13 @@
 const bcrypt = require('bcryptjs');
 const AppError = require('../utils/AppError');
 const { cleanString } = require('../utils/sql');
+const { parsePagination, buildPagination } = require('../utils/pagination');
+const { parseId } = require('../utils/ids');
+const { normalizeStoreInput } = require('../utils/storeInput');
+const { toAdminStoreRow, toAdminStoreDetails } = require('../utils/storeMapper');
 const { BCRYPT_ROUNDS } = require('../constants/security');
 const ROLES = require('../constants/roles');
+const { STORE_CATEGORIES, STORE_STATUS } = require('../constants/storeCategories');
 const userRepository = require('../repositories/userRepository');
 const storeRepository = require('../repositories/storeRepository');
 const analyticsRepository = require('../repositories/analyticsRepository');
@@ -31,7 +36,8 @@ const addUser = async ({ name, email, address, password, role }) => {
 };
 
 // ---------- Add store ----------
-const addStore = async ({ name, email, address, ownerId }) => {
+const addStore = async ({ name, email, address, ownerId, ...rest }) => {
+  const profile = normalizeStoreInput(rest);
   const ownerUserId = Number(ownerId);
 
   const owner = await userRepository.findById(ownerUserId);
@@ -47,8 +53,46 @@ const addStore = async ({ name, email, address, ownerId }) => {
     throw AppError.conflict('This owner already has a store', 'OWNER_HAS_STORE');
   }
 
-  const id = await storeRepository.create({ name, email, address, ownerId: ownerUserId });
-  return { id, name, email, address, ownerId: ownerUserId };
+  const id = await storeRepository.create({ name, email, address, ownerId: ownerUserId, ...profile });
+  return { id, name, email, address, ownerId: ownerUserId, status: STORE_STATUS.ACTIVE, ...profile };
+};
+
+// ---------- Edit store ----------
+const updateStore = async (id, input) => {
+  const storeId = parseId(id);
+  if (!storeId) {
+    throw AppError.notFound('Store not found', 'STORE_NOT_FOUND');
+  }
+
+  const existing = await storeRepository.findById(storeId);
+  if (!existing) {
+    throw AppError.notFound('Store not found', 'STORE_NOT_FOUND');
+  }
+
+  const profile = normalizeStoreInput(input);
+  const status = input.status ? String(input.status).toUpperCase() : existing.status;
+  if (!Object.values(STORE_STATUS).includes(status)) {
+    throw AppError.badRequest('Invalid status', 'INVALID_STATUS');
+  }
+
+  await storeRepository.update(storeId, {
+    name: input.name,
+    email: input.email,
+    address: input.address,
+    ...profile,
+    status,
+  });
+
+  return toAdminStoreDetails(await storeRepository.findDetailsById(storeId));
+};
+
+const getStoreDetails = async (id) => {
+  const storeId = parseId(id);
+  const row = storeId ? await storeRepository.findDetailsById(storeId) : null;
+  if (!row) {
+    throw AppError.notFound('Store not found', 'STORE_NOT_FOUND');
+  }
+  return toAdminStoreDetails(row);
 };
 
 // ---------- Lists (filter + sort) ----------
@@ -68,19 +112,37 @@ const listUsers = (query) => {
   });
 };
 
-const listStores = (query) =>
-  storeRepository.listForAdmin({
-    name: cleanString(query.name),
-    email: cleanString(query.email),
-    address: cleanString(query.address),
-    sortBy: query.sortBy,
-    order: query.order,
-  });
+const listStores = async (query) => {
+  const { page, limit, offset } = parsePagination(query, { defaultLimit: 10 });
+
+  const category = cleanString(query.category).toUpperCase();
+  if (category && !STORE_CATEGORIES.includes(category)) {
+    throw AppError.badRequest('Invalid category', 'INVALID_CATEGORY');
+  }
+  const status = cleanString(query.status).toUpperCase();
+  if (status && !Object.values(STORE_STATUS).includes(status)) {
+    throw AppError.badRequest('Invalid status', 'INVALID_STATUS');
+  }
+
+  const { rows, total } = await storeRepository.listForAdmin(
+    {
+      name: cleanString(query.name),
+      email: cleanString(query.email),
+      address: cleanString(query.address),
+      city: cleanString(query.city),
+      category,
+      status,
+    },
+    { sortBy: query.sortBy, order: query.order, limit, offset }
+  );
+
+  return { items: rows.map(toAdminStoreRow), pagination: buildPagination(page, limit, total) };
+};
 
 // ---------- User details (owners also get their store's rating) ----------
 const getUserDetails = async (id) => {
-  const userId = Number(id);
-  if (!Number.isInteger(userId) || userId < 1) {
+  const userId = parseId(id);
+  if (!userId) {
     throw AppError.notFound('User not found', 'USER_NOT_FOUND');
   }
 
@@ -99,6 +161,8 @@ module.exports = {
   getDashboardTotals,
   addUser,
   addStore,
+  updateStore,
+  getStoreDetails,
   listUsers,
   listStores,
   getUserDetails,

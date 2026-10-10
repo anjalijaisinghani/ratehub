@@ -7,4 +7,8 @@ const sendSuccess = (res, data = null, message = undefined, status = 200) => {
   return res.status(status).json(body);
 };
 
-module.exports = { sendSuccess };
+// Lists: { "success": true, "data": [...], "pagination": { page, limit, total, totalPages } }
+const sendPaginated = (res, items, pagination) =>
+  res.status(200).json({ success: true, data: items, pagination });
+
+module.exports = { sendSuccess, sendPaginated };

@@ -86,12 +86,16 @@ describe('adminService.addStore', () => {
 
     const store = await adminService.addStore(input);
 
-    expect(storeRepository.create).toHaveBeenCalledWith({
-      name: input.name,
-      email: input.email,
-      address: input.address,
-      ownerId: 3,
-    });
+    expect(storeRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: input.name,
+        email: input.email,
+        address: input.address,
+        ownerId: 3,
+        category: 'OTHER', // the default
+        description: null,
+      })
+    );
     expect(store).toMatchObject({ id: 9, ownerId: 3 });
   });
 });

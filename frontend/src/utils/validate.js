@@ -20,3 +20,32 @@ export const validatePassword = (v) => {
   if (!/[^A-Za-z0-9]/.test(v)) return 'Password must contain at least one special character';
   return '';
 };
+
+
+// ----- Store fields (all optional) -----
+export const validatePhone = (v) =>
+  !v.trim() || /^[0-9+()\-\s]{7,20}$/.test(v.trim()) ? '' : 'Phone must be 7 to 20 characters: digits, spaces, + ( ) -';
+
+export const validatePincode = (v) =>
+  !v.trim() || /^[A-Za-z0-9 -]{3,10}$/.test(v.trim()) ? '' : 'Pincode must be 3 to 10 letters or digits';
+
+export const validateUrl = (v) => {
+  if (!v.trim()) return '';
+  try {
+    const u = new URL(v.trim());
+    return ['http:', 'https:'].includes(u.protocol) ? '' : 'Link must start with http:// or https://';
+  } catch {
+    return 'Enter a valid link starting with http:// or https://';
+  }
+};
+
+const validateRange = (label, min, max) => (v) => {
+  if (!v.trim()) return '';
+  const n = Number(v);
+  return Number.isFinite(n) && n >= min && n <= max ? '' : `${label} must be a number between ${min} and ${max}`;
+};
+export const validateLatitude = validateRange('Latitude', -90, 90);
+export const validateLongitude = validateRange('Longitude', -180, 180);
+
+export const validateMaxLength = (label, max) => (v) =>
+  v.length > max ? `${label} must be at most ${max} characters` : '';

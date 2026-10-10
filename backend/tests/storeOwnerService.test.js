@@ -8,26 +8,21 @@ const ownerService = require('../src/services/ownerService');
 
 beforeEach(() => jest.resetAllMocks());
 
-describe('storeService.listForUser', () => {
-  test('passes the logged-in user id and cleaned search text', async () => {
-    storeRepository.listForUser.mockResolvedValue([]);
-
-    await storeService.listForUser(5, { name: ' Fresh ', address: ['x'], sortBy: 'myRating', order: 'desc' });
-
-    expect(storeRepository.listForUser).toHaveBeenCalledWith(5, {
-      name: 'Fresh',
-      address: '',
-      sortBy: 'myRating',
-      order: 'desc',
-    });
-  });
-});
-
 describe('storeService.submitRating', () => {
   test('a store that does not exist gives 404 and saves nothing', async () => {
     storeRepository.findById.mockResolvedValue(null);
 
     await expect(storeService.submitRating(2, '999', 4)).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'STORE_NOT_FOUND',
+    });
+    expect(ratingRepository.upsert).not.toHaveBeenCalled();
+  });
+
+  test('a hidden (INACTIVE) store cannot be rated: it behaves as if it did not exist', async () => {
+    storeRepository.findById.mockResolvedValue({ id: 1, status: 'INACTIVE' });
+
+    await expect(storeService.submitRating(2, '1', 4)).rejects.toMatchObject({
       statusCode: 404,
       code: 'STORE_NOT_FOUND',
     });
@@ -40,7 +35,7 @@ describe('storeService.submitRating', () => {
   });
 
   test('success saves the rating for THIS user and store', async () => {
-    storeRepository.findById.mockResolvedValue({ id: 1 });
+    storeRepository.findById.mockResolvedValue({ id: 1, status: 'ACTIVE' });
 
     const result = await storeService.submitRating(2, '1', 4);
 

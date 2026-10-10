@@ -22,6 +22,8 @@ const endpoints = [
   ['get', '/api/v1/admin/users', 'ADMIN'],
   ['get', '/api/v1/admin/users/1', 'ADMIN'],
   ['get', '/api/v1/admin/stores', 'ADMIN'],
+    ['get', '/api/v1/admin/stores/1', 'ADMIN'],
+  ['put', '/api/v1/admin/stores/1', 'ADMIN'],
   ['post', '/api/v1/admin/users', 'ADMIN'],
   ['post', '/api/v1/admin/stores', 'ADMIN'],
   ['get', '/api/v1/stores', 'USER'],
@@ -29,7 +31,14 @@ const endpoints = [
   ['get', '/api/v1/owner/dashboard', 'OWNER'],
 ];
 
-beforeEach(() => jest.clearAllMocks());
+const emptyPage = { items: [], pagination: { page: 1, limit: 12, total: 0, totalPages: 0 } };
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  // the list controllers expect { items, pagination } from the service
+  storeService.listForUser.mockResolvedValue(emptyPage);
+  adminService.listStores.mockResolvedValue(emptyPage);
+});
 
 describe.each(endpoints)('%s %s (only %s)', (method, url, allowedRole) => {
   test('no token gives 401', async () => {

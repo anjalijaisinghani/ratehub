@@ -1,10 +1,11 @@
 const storeService = require('../services/storeService');
 const asyncHandler = require('../utils/asyncHandler');
-const { sendSuccess } = require('../utils/response');
+const { sendSuccess, sendPaginated } = require('../utils/response');
 
-// GET /api/v1/stores?name=&address=&sortBy=&order=
+// GET /api/v1/stores?search=&category=&city=&minRating=&openNow=&sortBy=&order=&page=&limit=
 const listStoresForUser = asyncHandler(async (req, res) => {
-  sendSuccess(res, await storeService.listForUser(req.user.id, req.query));
+  const { items, pagination } = await storeService.listForUser(req.user.id, req.query);
+  sendPaginated(res, items, pagination);
 });
 
 // POST /api/v1/stores/:storeId/rating   body: { "rating": 4 }

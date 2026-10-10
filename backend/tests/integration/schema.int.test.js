@@ -84,3 +84,48 @@ describe('cascading deletes', () => {
     expect(ratings).toHaveLength(0);
   });
 });
+
+
+describe('store profile constraints (migration 006)', () => {
+  const { STORE_CATEGORIES } = require('../../src/constants/storeCategories');
+
+  const insertStore = async (columns, values) => {
+    const owner = await createUser({ label: 'Owner', role: 'OWNER' });
+    return db.query(
+      `INSERT INTO stores (name, email, address, owner_id, ${columns.join(', ')})
+       VALUES (?, ?, ?, ?, ${columns.map(() => '?').join(', ')})`,
+      ['Constraint Test Store Name', 'c@example.com', 'Pune', owner.id, ...values]
+    );
+  };
+
+  test('latitude must be within -90 and 90, longitude within -180 and 180', async () => {
+    await expect(insertStore(['latitude', 'longitude'], [91, 10])).rejects.toThrow();
+    await expect(insertStore(['latitude', 'longitude'], [-91, 10])).rejects.toThrow();
+    await expect(insertStore(['latitude', 'longitude'], [10, 181])).rejects.toThrow();
+    await expect(insertStore(['latitude', 'longitude'], [18.5, 73.8])).resolves.toBeDefined();
+  });
+
+  test('coordinates come in pairs: half a pair is rejected', async () => {
+    await expect(insertStore(['latitude'], [18.5])).rejects.toThrow();
+    await expect(insertStore(['longitude'], [73.8])).rejects.toThrow();
+  });
+
+  test('opening hours come in pairs: half a pair is rejected', async () => {
+    await expect(insertStore(['opening_time'], ['09:00:00'])).rejects.toThrow();
+    await expect(insertStore(['closing_time'], ['21:00:00'])).rejects.toThrow();
+    await expect(insertStore(['opening_time', 'closing_time'], ['09:00:00', '21:00:00'])).resolves.toBeDefined();
+  });
+
+  test('an unknown category is rejected by the database', async () => {
+    await expect(insertStore(['category'], ['SPACESHIP'])).rejects.toThrow();
+  });
+
+  test('the category ENUM in the database matches the list in the code', async () => {
+    const [[col]] = await db.query(
+      `SELECT COLUMN_TYPE AS t FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stores' AND COLUMN_NAME = 'category'`
+    );
+    const values = [...col.t.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+    expect(values).toEqual(STORE_CATEGORIES);
+  });
+});
