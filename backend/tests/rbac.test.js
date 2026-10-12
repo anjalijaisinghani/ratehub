@@ -6,10 +6,12 @@ jest.mock('../src/services/adminService');
 jest.mock('../src/services/analyticsService');
 jest.mock('../src/services/storeService');
 jest.mock('../src/services/ownerService');
+jest.mock('../src/services/reviewService');
 
 const adminService = require('../src/services/adminService');
 const storeService = require('../src/services/storeService');
 const ownerService = require('../src/services/ownerService');
+const reviewService = require('../src/services/reviewService')
 const app = require('../src/app');
 
 const tokenFor = (role, id = 1) => jwt.sign({ id, role }, process.env.JWT_SECRET);
@@ -28,6 +30,10 @@ const endpoints = [
   ['post', '/api/v1/admin/stores', 'ADMIN'],
   ['get', '/api/v1/stores', 'USER'],
     ['get', '/api/v1/stores/nearby', 'USER'],
+      ['get', '/api/v1/stores/1', 'USER'],
+  ['get', '/api/v1/stores/1/reviews', 'USER'],
+  ['put', '/api/v1/stores/1/review', 'USER'],
+  ['delete', '/api/v1/stores/1/review', 'USER'],
   ['post', '/api/v1/stores/1/rating', 'USER'],
   ['get', '/api/v1/owner/dashboard', 'OWNER'],
 ];
@@ -39,6 +45,8 @@ beforeEach(() => {
   // the list controllers expect { items, pagination } from the service
   storeService.listForUser.mockResolvedValue(emptyPage);
     storeService.listNearby.mockResolvedValue(emptyPage);
+      reviewService.listReviews.mockResolvedValue(emptyPage);
+  reviewService.saveReview.mockResolvedValue({ review: {}, created: true });
   adminService.listStores.mockResolvedValue(emptyPage);
 
 });
@@ -148,5 +156,35 @@ describe('data isolation (IDOR protection)', () => {
     await request(app).get('/api/v1/stores?userId=99').set('Authorization', `Bearer ${tokenFor('USER', 5)}`);
 
     expect(storeService.listForUser.mock.calls[0][0]).toBe(5);
+  });
+});
+
+
+describe('review request validation', () => {
+  const asUser = () => `Bearer ${tokenFor('USER', 5)}`;
+  const good = 'The staff were friendly and quick.';
+
+  test.each([
+    ['text too short', { rating: 4, text: 'Too short' }],
+    ['text too long', { rating: 4, text: 'x'.repeat(1001) }],
+    ['text missing', { rating: 4 }],
+    ['text is not a string', { rating: 4, text: 12345678901 }],
+    ['rating missing', { text: good }],
+    ['rating 6', { rating: 6, text: good }],
+    ['rating 3.5', { rating: 3.5, text: good }],
+  ])('%s gives 400 and nothing is saved', async (_label, body) => {
+    const res = await request(app).put('/api/v1/stores/1/review').set('Authorization', asUser()).send(body);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+    expect(reviewService.saveReview).not.toHaveBeenCalled();
+  });
+
+  test('a valid review reaches the service with the user from the TOKEN (a userId in the body is ignored)', async () => {
+    const res = await request(app)
+      .put('/api/v1/stores/1/review')
+      .set('Authorization', asUser())
+      .send({ rating: 4, text: good, userId: 99 });
+    expect(res.status).toBe(201);
+    expect(reviewService.saveReview).toHaveBeenCalledWith(5, '1', { rating: 4, text: good });
   });
 });

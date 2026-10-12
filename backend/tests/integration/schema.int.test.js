@@ -141,3 +141,50 @@ describe('location index (migration 007)', () => {
     expect(rows.map((r) => r.col)).toEqual(['latitude', 'longitude']);
   });
 });
+
+
+
+describe('review columns (migration 008)', () => {
+  const setup = async () => {
+    const owner = await createUser({ label: 'Owner', role: 'OWNER' });
+    const user = await createUser({ label: 'Reviewer' });
+    const store = await createStore({ ownerId: owner.id });
+    return { user, store };
+  };
+
+  const insert = (userId, storeId, text, reviewedAt) =>
+    db.query(
+      'INSERT INTO ratings (user_id, store_id, rating, review_text, reviewed_at) VALUES (?, ?, 4, ?, ?)',
+      [userId, storeId, text, reviewedAt]
+    );
+
+  test('review text must be 10 to 1000 characters', async () => {
+    const { user, store } = await setup();
+    await expect(insert(user.id, store.id, 'too short', new Date())).rejects.toThrow();
+    await expect(insert(user.id, store.id, 'x'.repeat(1001), new Date())).rejects.toThrow();
+    await expect(insert(user.id, store.id, 'x'.repeat(10), new Date())).resolves.toBeDefined();
+  });
+
+  test('the text and its date always come as a pair', async () => {
+    const { user, store } = await setup();
+    await expect(insert(user.id, store.id, 'a perfectly fine review', null)).rejects.toThrow();
+    await expect(insert(user.id, store.id, null, new Date())).rejects.toThrow();
+  });
+
+  test('a stars-only rating (no text, no date) is still allowed', async () => {
+    const { user, store } = await setup();
+    await expect(
+      db.query('INSERT INTO ratings (user_id, store_id, rating) VALUES (?, ?, 4)', [user.id, store.id])
+    ).resolves.toBeDefined();
+  });
+
+  test('the review indexes exist', async () => {
+    const [rows] = await db.query(
+      `SELECT DISTINCT INDEX_NAME AS name FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ratings'`
+    );
+    const names = rows.map((r) => r.name);
+    expect(names).toContain('idx_ratings_store_reviewed');
+    expect(names).toContain('idx_ratings_store_rating');
+  });
+});

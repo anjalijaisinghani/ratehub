@@ -43,10 +43,17 @@ const resendVerificationLimiter = createLimiter({
   message: 'Too many verification email requests. Please try again in an hour.',
 });
 
+// Writing or deleting reviews: a cap per IP per hour, so nobody can flood a store with reviews
+const reviewWriteLimiter = createLimiter({
+  ...config.rateLimit.reviews,
+  message: 'You are posting reviews too quickly. Please try again later.',
+});
+
 module.exports = {
   createLimiter,
   generalLimiter,
   loginLimiter,
   forgotPasswordLimiter,
   resendVerificationLimiter,
+  reviewWriteLimiter,
 };

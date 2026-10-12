@@ -49,3 +49,14 @@ export const validateLongitude = validateRange('Longitude', -180, 180);
 
 export const validateMaxLength = (label, max) => (v) =>
   v.length > max ? `${label} must be at most ${max} characters` : '';
+
+
+
+// ----- Reviews -----
+// [...text] counts real characters (an emoji is 1), exactly like the server does
+export const validateReviewText = (v) => {
+  const length = [...v.trim()].length;
+  if (length < 10) return 'Review must be at least 10 characters';
+  if (length > 1000) return 'Review must be at most 1000 characters';
+  return '';
+};

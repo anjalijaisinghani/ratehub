@@ -11,7 +11,9 @@ import AdminDashboard from './pages/AdminDashboard.jsx';
 import AdminUsers from './pages/AdminUsers.jsx';
 import AdminStores from './pages/AdminStores.jsx';
 import AddUser from './pages/AddUser.jsx';
-import StoreForm from './pages/StoreForm.jsx';import UserStores from './pages/UserStores.jsx';
+import StoreForm from './pages/StoreForm.jsx';
+import UserStores from './pages/UserStores.jsx';
+import StoreDetails from './pages/StoreDetails.jsx';
 import OwnerDashboard from './pages/OwnerDashboard.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
@@ -71,6 +73,7 @@ export default function App() {
         <Route path="/admin/stores/:id/edit" element={<AdminOnly><StoreForm /></AdminOnly>} />
 
         <Route path="/stores" element={<UserOnly><UserStores /></UserOnly>} />
+        <Route path="/stores/:id" element={<UserOnly><StoreDetails /></UserOnly>} />
         <Route path="/owner" element={<OwnerOnly><OwnerDashboard /></OwnerOnly>} />
 
         <Route

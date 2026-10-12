@@ -3,9 +3,15 @@ const { resolveSort, likePattern } = require('../utils/sql');
 const { boundingBox } = require('../utils/geo');
 
 // Average rating and number of ratings per store, calculated once in a sub-query
+
+
 const RATING_STATS = `
   LEFT JOIN (
-    SELECT store_id, AVG(rating) AS avg_rating, COUNT(*) AS rating_count
+    SELECT
+      store_id,
+      AVG(rating) AS avg_rating,
+      COUNT(*) AS rating_count,
+      COUNT(review_text) AS review_count
     FROM ratings
     GROUP BY store_id
   ) rs ON rs.store_id = s.id`;
@@ -218,6 +224,7 @@ const listForUser = async (userId, filters, { sortBy, order, limit, offset }, no
             ${distanceSelect} AS distanceKm,
             ROUND(rs.avg_rating, 1) AS overallRating,
             COALESCE(rs.rating_count, 0) AS ratingCount,
+            COALESCE(rs.review_count, 0) AS reviewCount,
             mine.rating AS myRating
        FROM stores s
        ${RATING_STATS}
@@ -232,6 +239,26 @@ const listForUser = async (userId, filters, { sortBy, order, limit, offset }, no
     where.params
   );
   return { rows, total };
+};
+
+// One ACTIVE store for the store page: profile, rating stats and the viewer's own rating.
+// Returns null if the store does not exist or is hidden (INACTIVE).
+const findActiveWithStats = async (userId, storeId, nowTime) => {
+  const [rows] = await db.query(
+    `SELECT ${PUBLIC_COLUMNS}, s.description,
+            ${OPEN_NOW_SQL} AS isOpenNow,
+            NULL AS distanceKm,
+            ROUND(rs.avg_rating, 1) AS overallRating,
+            COALESCE(rs.rating_count, 0) AS ratingCount,
+            COALESCE(rs.review_count, 0) AS reviewCount,
+            mine.rating AS myRating
+       FROM stores s
+       ${RATING_STATS}
+       LEFT JOIN ratings mine ON mine.store_id = s.id AND mine.user_id = ?
+      WHERE s.id = ? AND s.status = 'ACTIVE'`,
+    [...openNowParams(nowTime), userId, storeId]
+  );
+  return rows[0] || null;
 };
 
 // An owner's store(s) with average rating and rating count
@@ -261,6 +288,7 @@ const getAverageRatingForOwner = async (ownerId) => {
   return row.rating;
 };
 
+
 module.exports = {
   create,
   update,
@@ -269,6 +297,7 @@ module.exports = {
   countByOwner,
   listForAdmin,
   listForUser,
+  findActiveWithStats,
   findWithStatsByOwner,
   getAverageRatingForOwner,
 };

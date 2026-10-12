@@ -99,12 +99,24 @@ const tokenFromMail = (mail) => mail.text.match(/token=([0-9a-f]{64})/)[1];
 const ageTokens = (seconds) =>
   db.query('UPDATE auth_tokens SET created_at = ?', [new Date(Date.now() - seconds * 1000)]);
 
+
+// Inserts a rating directly. With "text" it is a written review; without, a stars-only rating.
+const createReview = async ({ userId, storeId, rating = 5, text = null, reviewedAt = new Date() }) => {
+  assertTestDatabase();
+  await db.query(
+    'INSERT INTO ratings (user_id, store_id, rating, review_text, reviewed_at) VALUES (?, ?, ?, ?, ?)',
+    [userId, storeId, rating, text, text ? reviewedAt : null]
+  );
+};
+
+
 module.exports = {
   PASSWORD,
   resetDb,
   closeDb,
   createUser,
   createStore,
+  createReview,
   loginAs,
   loginFull,
   getRefreshCookie,

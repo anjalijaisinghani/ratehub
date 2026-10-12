@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/api.js';
 import Stars from '../components/Stars.jsx';
 import Pagination from '../components/Pagination.jsx';
@@ -257,7 +258,7 @@ export default function UserStores() {
                 )}
               </div>
               <div className="store-body">
-                <h3>{s.name}</h3>
+                <h3><Link className="store-link" to={`/stores/${s.id}`}>{s.name}</Link></h3>
                 <div className="tag-row">
                   <span className="tag">{cat.icon} {cat.label}</span>
                   {s.distanceKm !== null && <span className="tag near">📍 {formatDistance(s.distanceKm)} away</span>}
@@ -285,13 +286,17 @@ export default function UserStores() {
                 </p>
                 <p>
                   <Stars value={s.overallRating} />
-                  <span className="muted"> ({s.ratingCount} {s.ratingCount === 1 ? 'rating' : 'ratings'})</span>
+                  <span className="muted">
+                    {' '}({s.ratingCount} {s.ratingCount === 1 ? 'rating' : 'ratings'} · {s.reviewCount}{' '}
+                    {s.reviewCount === 1 ? 'review' : 'reviews'})
+                  </span>
                 </p>
                 <p>Your rating: <Stars value={s.myRating} /></p>
                 <div className="store-actions">
                   <button onClick={() => handleRate(s)}>
-                    {s.myRating ? 'Modify my rating' : 'Rate this store'}
+                    {s.myRating ? 'Modify rating' : 'Quick rate'}
                   </button>
+                  <Link className="btn btn-outline" to={`/stores/${s.id}`}>Reviews</Link>
                 </div>
               </div>
             </div>
