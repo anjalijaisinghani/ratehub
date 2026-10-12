@@ -43,8 +43,10 @@ const distanceParams = ({ lat, lng }) => [lat, lat, lng];
 const PUBLIC_COLUMNS = `
   s.id, s.name, s.address, s.city, s.state, s.pincode, s.category, s.phone, s.website,
   s.image_url AS imageUrl, s.latitude, s.longitude,
-  s.opening_time AS openingTime, s.closing_time AS closingTime`;
-const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, s.email, s.status, s.created_at AS createdAt`;
+  s.opening_time AS openingTime, s.closing_time AS closingTime,
+  (s.verified_at IS NOT NULL) AS isVerified`;
+const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, s.email, s.status, s.created_at AS createdAt,
+  s.verified_at AS verifiedAt`;
 
 // Public names -> real SQL (only these can be used for sorting)
 const USER_SORT = {
@@ -101,6 +103,10 @@ const buildWhere = (f, nowTime, publicOnly) => {
     clauses.push('s.status = ?');
     params.push(f.status);
   }
+  // verified: true = only verified stores, false = only unverified, null/undefined = no filter
+  if (f.verified === true) clauses.push('s.verified_at IS NOT NULL');
+  if (f.verified === false) clauses.push('s.verified_at IS NULL');
+
   if (f.minRating) {
     clauses.push('rs.avg_rating >= ?');
     params.push(f.minRating);
@@ -261,6 +267,22 @@ const findActiveWithStats = async (userId, storeId, nowTime) => {
   return rows[0] || null;
 };
 
+// Turns the ✓ Verified badge on or off. Verifying twice keeps the ORIGINAL date and admin.
+// (MySQL evaluates the SET assignments left to right, so verified_by must come BEFORE verified_at.)
+const setVerification = async (id, verified, adminId, now) => {
+  if (verified) {
+    await db.query(
+      `UPDATE stores
+          SET verified_by = IF(verified_at IS NULL, ?, verified_by),
+              verified_at = COALESCE(verified_at, ?)
+        WHERE id = ?`,
+      [adminId, now, id]
+    );
+  } else {
+    await db.query('UPDATE stores SET verified_at = NULL, verified_by = NULL WHERE id = ?', [id]);
+  }
+};
+
 // An owner's store(s) with average rating and rating count
 const findWithStatsByOwner = async (ownerId) => {
   const [rows] = await db.query(
@@ -290,6 +312,7 @@ const getAverageRatingForOwner = async (ownerId) => {
 
 
 module.exports = {
+  setVerification,
   create,
   update,
   findById,

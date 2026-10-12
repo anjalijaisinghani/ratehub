@@ -37,6 +37,7 @@ const config = {
     general: { windowMs: 15 * 60 * 1000, limit: num(process.env.RATE_LIMIT_GENERAL, 600) },
     login: { windowMs: 15 * 60 * 1000, limit: num(process.env.RATE_LIMIT_LOGIN, 5) },
         reviews: { windowMs: 60 * 60 * 1000, limit: num(process.env.RATE_LIMIT_REVIEWS, 30) },
+            reactions: { windowMs: 60 * 60 * 1000, limit: num(process.env.RATE_LIMIT_REACTIONS, 120) },
   },
 };
 

@@ -358,3 +358,12 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .button-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .button-row button { margin-top: 12px; }
+
+
+/* ===== Replies, helpful votes, verified ===== */
+.owner-reply { background: var(--hover); border-left: 3px solid var(--purple); border-radius: 8px; padding: 10px 14px; margin-top: 10px; }
+.owner-reply .review-text { margin-top: 4px; }
+.helpful-row { margin-top: 10px; }
+.helpful-row .chip { padding: 5px 12px; }
+.tag.verified { background: rgba(30, 107, 255, 0.16); color: var(--blue); }
+.verified-mark { color: var(--blue); font-weight: 800; }

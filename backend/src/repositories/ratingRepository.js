@@ -8,7 +8,10 @@ const RATER_SORT = {
   date: 'r.updated_at',
 };
 
-const REVIEW_SORT = { newest: 'r.reviewed_at', rating: 'r.rating' };
+// "helpfulCount" is the alias of the vote-counting sub-query in the SELECT list
+const REVIEW_SORT = { newest: 'r.reviewed_at', rating: 'r.rating', helpful: 'helpfulCount' };
+
+const HELPFUL_COUNT_SQL = '(SELECT COUNT(*) FROM review_votes v WHERE v.rating_id = r.id)';
 
 // Insert a new rating, or update it if this user already rated this store.
 // Works because of UNIQUE(user_id, store_id) in the table.
@@ -42,8 +45,14 @@ const findRatersByOwner = async (ownerId, sortBy, order) => {
 
 // ---------- Reviews ----------
 
+// The user's own row, plus how many helpful votes it has
 const findByUserAndStore = async (userId, storeId) => {
-  const [rows] = await db.query('SELECT * FROM ratings WHERE user_id = ? AND store_id = ?', [userId, storeId]);
+  const [rows] = await db.query(
+    `SELECT r.*, ${HELPFUL_COUNT_SQL} AS helpful_count
+       FROM ratings r
+      WHERE r.user_id = ? AND r.store_id = ?`,
+    [userId, storeId]
+  );
   return rows[0] || null;
 };
 
@@ -61,7 +70,8 @@ const saveReview = async ({ userId, storeId, rating, text, reviewedAt, editedAt 
   );
 };
 
-// Removes the user's rating AND review for a store. Returns true if something was deleted.
+// Removes the user's rating AND review (and its reply and votes) for a store.
+// Returns true if something was deleted.
 const deleteByUserAndStore = async (userId, storeId) => {
   const [result] = await db.query('DELETE FROM ratings WHERE user_id = ? AND store_id = ?', [userId, storeId]);
   return result.affectedRows > 0;
@@ -87,20 +97,85 @@ const listReviews = async (storeId, viewerId, { rating, sortBy, order, limit, of
     params.push(rating);
   }
 
-  // Parameter order = the order the ? appear: SELECT (isMine) -> WHERE -> LIMIT
+  // Parameter order = the order the ? appear: SELECT (isMine, iVoted) -> WHERE -> LIMIT
   const [rows] = await db.query(
     `SELECT r.id, r.rating, r.review_text AS text, r.reviewed_at AS reviewedAt,
             r.review_edited_at AS editedAt, u.name AS reviewerName,
-            (r.user_id = ?) AS isMine
+            r.reply_text AS replyText, r.replied_at AS repliedAt, r.reply_edited_at AS replyEditedAt,
+            (r.user_id = ?) AS isMine,
+            ${HELPFUL_COUNT_SQL} AS helpfulCount,
+            EXISTS(SELECT 1 FROM review_votes v WHERE v.rating_id = r.id AND v.user_id = ?) AS iVoted
        FROM ratings r
        JOIN users u ON u.id = r.user_id
        ${where}
        ORDER BY ${sort.column} ${sort.direction}, r.reviewed_at DESC, r.id ASC
        LIMIT ? OFFSET ?`,
-    [viewerId, ...params, limit, offset]
+    [viewerId, viewerId, ...params, limit, offset]
   );
   const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM ratings r ${where}`, params);
   return { rows, total };
+};
+
+// ---------- Owner side: reviews of MY store, and replies ----------
+
+// Reviews of the stores owned by this owner. The "s.owner_id = ?" in the join is the
+// ownership check: another owner's reviews can never appear here.
+const listReviewsForOwner = async (ownerId, { rating, replied, sortBy, order, limit, offset }) => {
+  const sort = resolveSort(sortBy, order, REVIEW_SORT, 'newest');
+
+  let where = 'WHERE s.owner_id = ? AND r.review_text IS NOT NULL';
+  const params = [ownerId];
+  if (rating) {
+    where += ' AND r.rating = ?';
+    params.push(rating);
+  }
+  if (replied === true) where += ' AND r.reply_text IS NOT NULL';
+  if (replied === false) where += ' AND r.reply_text IS NULL';
+
+  const [rows] = await db.query(
+    `SELECT r.id, r.rating, r.review_text AS text, r.reviewed_at AS reviewedAt,
+            r.review_edited_at AS editedAt, u.name AS reviewerName, s.name AS storeName,
+            r.reply_text AS replyText, r.replied_at AS repliedAt, r.reply_edited_at AS replyEditedAt,
+            ${HELPFUL_COUNT_SQL} AS helpfulCount
+       FROM ratings r
+       JOIN users  u ON u.id = r.user_id
+       JOIN stores s ON s.id = r.store_id
+       ${where}
+       ORDER BY ${sort.column} ${sort.direction}, r.reviewed_at DESC, r.id ASC
+       LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+  const [[{ total }]] = await db.query(
+    `SELECT COUNT(*) AS total FROM ratings r JOIN stores s ON s.id = r.store_id ${where}`,
+    params
+  );
+  return { rows, total };
+};
+
+// One review, but ONLY if it belongs to a store owned by this owner (and has text)
+const findReviewForOwner = async (ownerId, reviewId) => {
+  const [rows] = await db.query(
+    `SELECT r.*
+       FROM ratings r
+       JOIN stores s ON s.id = r.store_id
+      WHERE r.id = ? AND s.owner_id = ? AND r.review_text IS NOT NULL`,
+    [reviewId, ownerId]
+  );
+  return rows[0] || null;
+};
+
+const saveReply = async (reviewId, text, repliedAt, editedAt) => {
+  await db.query(
+    'UPDATE ratings SET reply_text = ?, replied_at = ?, reply_edited_at = ? WHERE id = ?',
+    [text, repliedAt, editedAt, reviewId]
+  );
+};
+
+const clearReply = async (reviewId) => {
+  await db.query(
+    'UPDATE ratings SET reply_text = NULL, replied_at = NULL, reply_edited_at = NULL WHERE id = ?',
+    [reviewId]
+  );
 };
 
 module.exports = {
@@ -111,4 +186,8 @@ module.exports = {
   deleteByUserAndStore,
   getDistribution,
   listReviews,
+  listReviewsForOwner,
+  findReviewForOwner,
+  saveReply,
+  clearReply,
 };

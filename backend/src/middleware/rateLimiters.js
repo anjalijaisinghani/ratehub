@@ -43,10 +43,16 @@ const resendVerificationLimiter = createLimiter({
   message: 'Too many verification email requests. Please try again in an hour.',
 });
 
-// Writing or deleting reviews: a cap per IP per hour, so nobody can flood a store with reviews
+// Writing or deleting reviews and replies: a cap per IP per hour
 const reviewWriteLimiter = createLimiter({
   ...config.rateLimit.reviews,
-  message: 'You are posting reviews too quickly. Please try again later.',
+  message: 'You are posting too quickly. Please try again later.',
+});
+
+// Helpful votes are small and frequent, so the cap is higher
+const reactionLimiter = createLimiter({
+  ...config.rateLimit.reactions,
+  message: 'You are voting too quickly. Please try again later.',
 });
 
 module.exports = {
@@ -56,4 +62,5 @@ module.exports = {
   forgotPasswordLimiter,
   resendVerificationLimiter,
   reviewWriteLimiter,
+  reactionLimiter,
 };

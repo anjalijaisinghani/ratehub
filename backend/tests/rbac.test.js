@@ -7,11 +7,15 @@ jest.mock('../src/services/analyticsService');
 jest.mock('../src/services/storeService');
 jest.mock('../src/services/ownerService');
 jest.mock('../src/services/reviewService');
+jest.mock('../src/services/reviewVoteService');
+jest.mock('../src/services/replyService');
 
 const adminService = require('../src/services/adminService');
 const storeService = require('../src/services/storeService');
 const ownerService = require('../src/services/ownerService');
-const reviewService = require('../src/services/reviewService')
+const reviewService = require('../src/services/reviewService');
+const reviewVoteService = require('../src/services/reviewVoteService');
+const replyService = require('../src/services/replyService');
 const app = require('../src/app');
 
 const tokenFor = (role, id = 1) => jwt.sign({ id, role }, process.env.JWT_SECRET);
@@ -34,6 +38,12 @@ const endpoints = [
   ['get', '/api/v1/stores/1/reviews', 'USER'],
   ['put', '/api/v1/stores/1/review', 'USER'],
   ['delete', '/api/v1/stores/1/review', 'USER'],
+    ['put', '/api/v1/stores/1/reviews/1/helpful', 'USER'],
+  ['delete', '/api/v1/stores/1/reviews/1/helpful', 'USER'],
+  ['get', '/api/v1/owner/reviews', 'OWNER'],
+  ['put', '/api/v1/owner/reviews/1/reply', 'OWNER'],
+  ['delete', '/api/v1/owner/reviews/1/reply', 'OWNER'],
+  ['put', '/api/v1/admin/stores/1/verification', 'ADMIN'],
   ['post', '/api/v1/stores/1/rating', 'USER'],
   ['get', '/api/v1/owner/dashboard', 'OWNER'],
 ];
@@ -47,6 +57,9 @@ beforeEach(() => {
     storeService.listNearby.mockResolvedValue(emptyPage);
       reviewService.listReviews.mockResolvedValue(emptyPage);
   reviewService.saveReview.mockResolvedValue({ review: {}, created: true });
+    reviewVoteService.setHelpful.mockResolvedValue({ helpfulCount: 1, iVoted: true });
+  replyService.listForOwner.mockResolvedValue(emptyPage);
+  replyService.saveReply.mockResolvedValue({ reply: {}, created: true });
   adminService.listStores.mockResolvedValue(emptyPage);
 
 });
@@ -186,5 +199,68 @@ describe('review request validation', () => {
       .send({ rating: 4, text: good, userId: 99 });
     expect(res.status).toBe(201);
     expect(reviewService.saveReview).toHaveBeenCalledWith(5, '1', { rating: 4, text: good });
+  });
+});
+
+
+describe('reply, vote and verification requests', () => {
+  const asOwner = () => `Bearer ${tokenFor('OWNER', 7)}`;
+  const asUser = () => `Bearer ${tokenFor('USER', 5)}`;
+  const asAdmin = () => `Bearer ${tokenFor('ADMIN', 1)}`;
+
+  test.each([
+    ['reply too short', { text: 'Hi' }],
+    ['reply too long', { text: 'x'.repeat(1001) }],
+    ['reply missing', {}],
+    ['reply not a string', { text: 123456789 }],
+  ])('%s gives 400 and nothing is saved', async (_label, body) => {
+    const res = await request(app).put('/api/v1/owner/reviews/3/reply').set('Authorization', asOwner()).send(body);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+    expect(replyService.saveReply).not.toHaveBeenCalled();
+  });
+
+  test('a valid reply reaches the service with the OWNER from the token', async () => {
+    const res = await request(app)
+      .put('/api/v1/owner/reviews/3/reply')
+      .set('Authorization', asOwner())
+      .send({ text: 'Thank you for your feedback!', ownerId: 99 });
+    expect(res.status).toBe(201);
+    expect(replyService.saveReply).toHaveBeenCalledWith(7, '3', 'Thank you for your feedback!');
+  });
+
+  test('the owner review list always uses the owner id from the token', async () => {
+    await request(app).get('/api/v1/owner/reviews?ownerId=99').set('Authorization', asOwner());
+    expect(replyService.listForOwner.mock.calls[0][0]).toBe(7);
+  });
+
+  test('a helpful vote uses the user from the token', async () => {
+    const res = await request(app).put('/api/v1/stores/2/reviews/3/helpful').set('Authorization', asUser());
+    expect(res.status).toBe(200);
+    expect(reviewVoteService.setHelpful).toHaveBeenCalledWith(5, '2', '3', true);
+
+    await request(app).delete('/api/v1/stores/2/reviews/3/helpful').set('Authorization', asUser());
+    expect(reviewVoteService.setHelpful).toHaveBeenLastCalledWith(5, '2', '3', false);
+  });
+
+  test.each([['yes'], [1], [null], [undefined], ['true']])('verified = %p gives 400 and nothing changes', async (verified) => {
+    const res = await request(app)
+      .put('/api/v1/admin/stores/4/verification')
+      .set('Authorization', asAdmin())
+      .send({ verified });
+    expect(res.status).toBe(400);
+    expect(adminService.setStoreVerification).not.toHaveBeenCalled();
+  });
+
+  test('verified true or false reaches the service with the ADMIN from the token', async () => {
+    const on = await request(app)
+      .put('/api/v1/admin/stores/4/verification')
+      .set('Authorization', asAdmin())
+      .send({ verified: true });
+    expect(on.status).toBe(200);
+    expect(adminService.setStoreVerification).toHaveBeenCalledWith('4', true, 1);
+
+    await request(app).put('/api/v1/admin/stores/4/verification').set('Authorization', asAdmin()).send({ verified: false });
+    expect(adminService.setStoreVerification).toHaveBeenLastCalledWith('4', false, 1);
   });
 });

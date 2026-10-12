@@ -15,6 +15,7 @@ import StoreForm from './pages/StoreForm.jsx';
 import UserStores from './pages/UserStores.jsx';
 import StoreDetails from './pages/StoreDetails.jsx';
 import OwnerDashboard from './pages/OwnerDashboard.jsx';
+import OwnerReviews from './pages/OwnerReviews.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
@@ -73,8 +74,10 @@ export default function App() {
         <Route path="/admin/stores/:id/edit" element={<AdminOnly><StoreForm /></AdminOnly>} />
 
         <Route path="/stores" element={<UserOnly><UserStores /></UserOnly>} />
-        <Route path="/stores/:id" element={<UserOnly><StoreDetails /></UserOnly>} />
-        <Route path="/owner" element={<OwnerOnly><OwnerDashboard /></OwnerOnly>} />
+<Route path="/stores/:id" element={<UserOnly><StoreDetails /></UserOnly>} />
+
+<Route path="/owner" element={<OwnerOnly><OwnerDashboard /></OwnerOnly>} />
+<Route path="/owner/reviews" element={<OwnerOnly><OwnerReviews /></OwnerOnly>} />
 
         <Route
           path="/change-password"

@@ -57,7 +57,7 @@ const addStore = async ({ name, email, address, ownerId, ...rest }) => {
   return { id, name, email, address, ownerId: ownerUserId, status: STORE_STATUS.ACTIVE, ...profile };
 };
 
-// ---------- Edit store ----------
+// ---------- Edit store (never touches the verification badge) ----------
 const updateStore = async (id, input) => {
   const storeId = parseId(id);
   if (!storeId) {
@@ -95,6 +95,18 @@ const getStoreDetails = async (id) => {
   return toAdminStoreDetails(row);
 };
 
+// ---------- Verified badge on / off (safe to repeat) ----------
+const setStoreVerification = async (id, verified, adminId) => {
+  const storeId = parseId(id);
+  const existing = storeId ? await storeRepository.findById(storeId) : null;
+  if (!existing) {
+    throw AppError.notFound('Store not found', 'STORE_NOT_FOUND');
+  }
+
+  await storeRepository.setVerification(storeId, verified, adminId, new Date());
+  return toAdminStoreDetails(await storeRepository.findDetailsById(storeId));
+};
+
 // ---------- Lists (filter + sort) ----------
 const listUsers = (query) => {
   const role = cleanString(query.role);
@@ -123,6 +135,11 @@ const listStores = async (query) => {
   if (status && !Object.values(STORE_STATUS).includes(status)) {
     throw AppError.badRequest('Invalid status', 'INVALID_STATUS');
   }
+  const verifiedText = cleanString(query.verified).toLowerCase();
+  if (verifiedText && !['true', 'false'].includes(verifiedText)) {
+    throw AppError.badRequest('verified must be true or false', 'INVALID_VERIFIED_FILTER');
+  }
+  const verified = verifiedText === '' ? null : verifiedText === 'true';
 
   const { rows, total } = await storeRepository.listForAdmin(
     {
@@ -132,6 +149,7 @@ const listStores = async (query) => {
       city: cleanString(query.city),
       category,
       status,
+      verified,
     },
     { sortBy: query.sortBy, order: query.order, limit, offset }
   );
@@ -163,6 +181,7 @@ module.exports = {
   addStore,
   updateStore,
   getStoreDetails,
+  setStoreVerification,
   listUsers,
   listStores,
   getUserDetails,

@@ -17,6 +17,7 @@ const SORTS = [
   { value: 'newest:asc', label: 'Oldest first' },
   { value: 'rating:desc', label: 'Highest rating' },
   { value: 'rating:asc', label: 'Lowest rating' },
+  { value: 'helpful:desc', label: 'Most helpful' },
 ];
 
 const formatDate = (iso) =>
@@ -45,6 +46,7 @@ export default function StoreDetails() {
   const [editing, setEditing] = useState(false);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+    const [votingId, setVotingId] = useState(null);
 
   // Store profile + rating summary + my own review
   useEffect(() => {
@@ -160,6 +162,24 @@ export default function StoreDetails() {
     }
   };
 
+  // Mark a review helpful, or take the vote back. The server answers with the new count.
+  const toggleHelpful = async (review) => {
+    setVotingId(review.id);
+    try {
+      const url = `/stores/${storeId}/reviews/${review.id}/helpful`;
+      const res = review.iVoted ? await api.delete(url) : await api.put(url);
+      const { helpfulCount, iVoted } = res.data.data;
+      setReviews((current) => ({
+        ...current,
+        items: current.items.map((r) => (r.id === review.id ? { ...r, helpfulCount, iVoted } : r)),
+      }));
+    } catch (err) {
+      showError(err.response?.data?.message || 'Could not save your vote');
+    } finally {
+      setVotingId(null);
+    }
+  };
+
   if (notFound) {
     return (
       <div className="container">
@@ -200,6 +220,7 @@ export default function StoreDetails() {
           <h2 style={{ marginBottom: 8 }}>{store.name}</h2>
           <div className="tag-row">
             <span className="tag">{cat.icon} {cat.label}</span>
+            {store.isVerified && <span className="tag verified">✓ Verified</span>}
             {store.isOpenNow === true && <span className="tag open">Open now</span>}
             {store.isOpenNow === false && <span className="tag closed">Closed</span>}
           </div>
@@ -251,6 +272,16 @@ export default function StoreDetails() {
               </span>
             </div>
             <p className="review-text">{my.text}</p>
+            {my.reply && (
+              <div className="owner-reply">
+                <strong>Response from the owner</strong>
+                <span className="muted">
+                  {' '}· {formatDate(my.reply.editedAt || my.reply.repliedAt)}{my.reply.editedAt ? ' (edited)' : ''}
+                </span>
+                <p className="review-text">{my.reply.text}</p>
+              </div>
+            )}
+            <p className="muted">👍 {my.helpfulCount} found this helpful</p>
             <div className="button-row">
               <button className="small" onClick={startEdit}>Edit review</button>
               <button className="small danger" onClick={handleDelete}>Delete review</button>
@@ -342,6 +373,29 @@ export default function StoreDetails() {
                 </div>
                 {/* React escapes this text, so HTML typed by a user is shown literally and never runs */}
                 <p className="review-text">{r.text}</p>
+                {r.reply && (
+                  <div className="owner-reply">
+                    <strong>Response from the owner</strong>
+                    <span className="muted">
+                      {' '}· {formatDate(r.reply.editedAt || r.reply.repliedAt)}{r.reply.editedAt ? ' (edited)' : ''}
+                    </span>
+                    <p className="review-text">{r.reply.text}</p>
+                  </div>
+                )}
+                <div className="helpful-row">
+                  {r.isMine ? (
+                    <span className="muted">👍 {r.helpfulCount} found this helpful</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`chip ${r.iVoted ? 'active' : ''}`}
+                      disabled={votingId === r.id}
+                      onClick={() => toggleHelpful(r)}
+                    >
+                      👍 Helpful ({r.helpfulCount})
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           ))}

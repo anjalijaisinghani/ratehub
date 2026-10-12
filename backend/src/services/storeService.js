@@ -54,6 +54,7 @@ const listForUser = async (userId, query, { nearby = false } = {}) => {
     category,
     minRating,
     openNow: isTrue(cleanString(query.openNow)),
+    verified: isTrue(cleanString(query.verified)) ? true : null, // customers can only ask for "verified only"
     location,
   };
 

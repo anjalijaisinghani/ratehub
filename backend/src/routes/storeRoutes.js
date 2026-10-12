@@ -1,8 +1,15 @@
 const express = require('express');
 const { listStoresForUser, listNearbyStores, submitRating } = require('../controllers/storeController');
-const { getStore, listReviews, saveReview, deleteReview } = require('../controllers/reviewController');
+const {
+  getStore,
+  listReviews,
+  saveReview,
+  deleteReview,
+  markHelpful,
+  unmarkHelpful,
+} = require('../controllers/reviewController');
 const { authenticate, authorize } = require('../middleware/auth');
-const { reviewWriteLimiter } = require('../middleware/rateLimiters');
+const { reviewWriteLimiter, reactionLimiter } = require('../middleware/rateLimiters');
 const { ratingRule, handleValidation } = require('../utils/validators');
 const { reviewTextRule } = require('../utils/reviewValidators');
 
@@ -18,6 +25,9 @@ router.get('/:storeId', getStore);
 router.get('/:storeId/reviews', listReviews);
 router.put('/:storeId/review', reviewWriteLimiter, [ratingRule, reviewTextRule, handleValidation], saveReview);
 router.delete('/:storeId/review', reviewWriteLimiter, deleteReview);
+
+router.put('/:storeId/reviews/:reviewId/helpful', reactionLimiter, markHelpful);
+router.delete('/:storeId/reviews/:reviewId/helpful', reactionLimiter, unmarkHelpful);
 
 router.post('/:storeId/rating', [ratingRule, handleValidation], submitRating);
 

@@ -55,3 +55,30 @@ describe('normalizeReviewText', () => {
     expect(() => normalizeReviewText('\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0000\u0001')).toThrow();
   });
 });
+
+
+describe('normalizeReplyText', () => {
+  const { normalizeReplyText, REPLY_MIN, REPLY_MAX } = require('../src/utils/reviewText');
+
+  test('limits are 5 and 1000 characters, inclusive', () => {
+    expect(REPLY_MIN).toBe(5);
+    expect(REPLY_MAX).toBe(1000);
+    expect(normalizeReplyText('a'.repeat(5))).toHaveLength(5);
+    expect(normalizeReplyText('a'.repeat(1000))).toHaveLength(1000);
+    expect(() => normalizeReplyText('a'.repeat(4))).toThrow(expect.objectContaining({ code: 'INVALID_REPLY_TEXT' }));
+    expect(() => normalizeReplyText('a'.repeat(1001))).toThrow(expect.objectContaining({ statusCode: 400 }));
+  });
+
+  test('cleans the text like a review: trim, line breaks, control characters', () => {
+    expect(normalizeReplyText('  Thank you\r\n\r\n\r\n\r\nso much\u0007!  ')).toBe('Thank you\n\nso much!');
+  });
+
+  test('an emoji counts as one character', () => {
+    expect(() => normalizeReplyText('🙏'.repeat(5))).not.toThrow();
+    expect(() => normalizeReplyText('🙏'.repeat(4))).toThrow();
+  });
+
+  test('a non-string is rejected', () => {
+    expect(() => normalizeReplyText(undefined)).toThrow(expect.objectContaining({ code: 'INVALID_REPLY_TEXT' }));
+  });
+});

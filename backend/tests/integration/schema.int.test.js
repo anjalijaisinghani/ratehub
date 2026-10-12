@@ -188,3 +188,83 @@ describe('review columns (migration 008)', () => {
     expect(names).toContain('idx_ratings_store_rating');
   });
 });
+
+
+describe('replies, votes and verification (migration 009)', () => {
+  const setup = async () => {
+    const owner = await createUser({ label: 'Owner', role: 'OWNER' });
+    const user = await createUser({ label: 'Reviewer' });
+    const voter = await createUser({ label: 'Voter' });
+    const store = await createStore({ ownerId: owner.id });
+    return { owner, user, voter, store };
+  };
+
+  const insertReview = async (userId, storeId, extra = {}) => {
+    const columns = { review_text: 'a perfectly fine review', reviewed_at: new Date(), ...extra };
+    const names = Object.keys(columns);
+    const [result] = await db.query(
+      `INSERT INTO ratings (user_id, store_id, rating, ${names.join(', ')}) VALUES (?, ?, 4, ${names.map(() => '?').join(', ')})`,
+      [userId, storeId, ...names.map((n) => columns[n])]
+    );
+    return result.insertId;
+  };
+
+  test('reply text must be 5 to 1000 characters', async () => {
+    const { user, store } = await setup();
+    const id = await insertReview(user.id, store.id);
+    const set = (text) => db.query('UPDATE ratings SET reply_text = ?, replied_at = ? WHERE id = ?', [text, new Date(), id]);
+
+    await expect(set('Hi')).rejects.toThrow();
+    await expect(set('x'.repeat(1001))).rejects.toThrow();
+    await expect(set('x'.repeat(5))).resolves.toBeDefined();
+  });
+
+  test('a reply and its date always come as a pair', async () => {
+    const { user, store } = await setup();
+    const id = await insertReview(user.id, store.id);
+    await expect(db.query('UPDATE ratings SET reply_text = ? WHERE id = ?', ['a fine reply', id])).rejects.toThrow();
+    await expect(db.query('UPDATE ratings SET replied_at = ? WHERE id = ?', [new Date(), id])).rejects.toThrow();
+  });
+
+  test('a stars-only rating cannot have a reply', async () => {
+    const { user, store } = await setup();
+    await expect(
+      db.query(
+        'INSERT INTO ratings (user_id, store_id, rating, reply_text, replied_at) VALUES (?, ?, 4, ?, ?)',
+        [user.id, store.id, 'a fine reply', new Date()]
+      )
+    ).rejects.toThrow();
+  });
+
+  test('one vote per user per review, and votes disappear with the review or the user', async () => {
+    const { user, voter, store } = await setup();
+    const id = await insertReview(user.id, store.id);
+    const addVote = () =>
+      db.query('INSERT INTO review_votes (rating_id, user_id, created_at) VALUES (?, ?, ?)', [id, voter.id, new Date()]);
+
+    await addVote();
+    await expect(addVote()).rejects.toMatchObject({ code: 'ER_DUP_ENTRY' });
+
+    await db.query('DELETE FROM users WHERE id = ?', [voter.id]);
+    expect((await db.query('SELECT id FROM review_votes'))[0]).toHaveLength(0);
+
+    const voter2 = await createUser({ label: 'VoterTwo' });
+    await db.query('INSERT INTO review_votes (rating_id, user_id, created_at) VALUES (?, ?, ?)', [id, voter2.id, new Date()]);
+    await db.query('DELETE FROM ratings WHERE id = ?', [id]);
+    expect((await db.query('SELECT id FROM review_votes'))[0]).toHaveLength(0);
+  });
+
+  test('a vote cannot point at a review or a user that does not exist', async () => {
+    await expect(
+      db.query('INSERT INTO review_votes (rating_id, user_id, created_at) VALUES (999999, 999998, ?)', [new Date()])
+    ).rejects.toThrow();
+  });
+
+  test('the store index for verification exists', async () => {
+    const [rows] = await db.query(
+      `SELECT DISTINCT INDEX_NAME AS name FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stores'`
+    );
+    expect(rows.map((r) => r.name)).toContain('idx_stores_verified');
+  });
+});

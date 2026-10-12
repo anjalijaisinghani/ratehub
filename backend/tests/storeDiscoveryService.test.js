@@ -33,6 +33,7 @@ describe('storeService.listForUser', () => {
       minRating: 4,
       openNow: true,
             location: null,
+                  verified: null,
     });
     expect(paging).toEqual({ sortBy: 'overallRating', order: 'desc', limit: 6, offset: 6 });
     expect(nowTime).toMatch(/^\d{2}:\d{2}:\d{2}$/);
@@ -193,5 +194,18 @@ describe('storeService location search', () => {
     const result = await storeService.listNearby(1, { lat: '18.5', lng: '73.8' });
     expect(result.items[0].distanceKm).toBe(1.11);
     expect(result.items[1].distanceKm).toBeNull();
+  });
+});
+
+
+describe('storeService verified filter', () => {
+  test('"verified=true" asks for verified stores only; anything else means no filter', async () => {
+    await storeService.listForUser(1, { verified: 'true' });
+    await storeService.listForUser(1, { verified: 'false' }); // customers cannot ask for "unverified only"
+    await storeService.listForUser(1, {});
+    const calls = storeRepository.listForUser.mock.calls;
+    expect(calls[0][1].verified).toBe(true);
+    expect(calls[1][1].verified).toBeNull();
+    expect(calls[2][1].verified).toBeNull();
   });
 });

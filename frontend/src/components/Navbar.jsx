@@ -37,7 +37,12 @@ export default function Navbar() {
           </>
         )}
         {user.role === 'USER' && <NavLink to="/stores" className={link}>Stores</NavLink>}
-        {user.role === 'OWNER' && <NavLink to="/owner" className={link}>My Store</NavLink>}
+        {user.role === 'OWNER' && (
+          <>
+            <NavLink to="/owner" end className={link}>My Store</NavLink>
+            <NavLink to="/owner/reviews" className={link}>Reviews</NavLink>
+          </>
+        )}
         <NavLink to="/change-password" className={link}>Change Password</NavLink>
       </div>
       <div className="nav-right">

@@ -67,3 +67,28 @@ export const askRating = async (storeName, currentRating) => {
   });
   return result.isConfirmed ? Number(result.value) : null;
 };
+
+
+// Popup with a text box for the owner's reply. Returns the text, or null if cancelled.
+export const askReply = async (reviewText, existing = '') => {
+  const shortReview = [...reviewText].length > 160 ? `${[...reviewText].slice(0, 160).join('')}…` : reviewText;
+
+  const result = await Swal.fire({
+    ...themed(),
+    title: existing ? 'Edit your reply' : 'Reply to this review',
+    text: shortReview, // "text" is shown as plain text, so HTML in a review can't run here
+    input: 'textarea',
+    inputValue: existing,
+    inputPlaceholder: 'Write a polite, helpful reply (5 to 1000 characters)',
+    inputValidator: (value) => {
+      const length = [...value.trim()].length;
+      if (length < 5 || length > 1000) return 'Reply must be between 5 and 1000 characters';
+      return undefined;
+    },
+    showCancelButton: true,
+    confirmButtonText: existing ? 'Save reply' : 'Post reply',
+    confirmButtonColor: colors.confirm,
+    cancelButtonColor: colors.cancel,
+  });
+  return result.isConfirmed ? result.value.trim() : null;
+};

@@ -28,7 +28,7 @@ const RADII = [
   { value: '', label: 'Any distance' },
 ];
 
-const emptyFilters = { search: '', category: '', city: '', minRating: '', openNow: false };
+const emptyFilters = { search: '', category: '', city: '', minRating: '', openNow: false, verified: false };
 
 export default function UserStores() {
   const [filters, setFilters] = useState(emptyFilters);
@@ -55,6 +55,7 @@ export default function UserStores() {
     if (debounced.city.trim()) params.city = debounced.city.trim();
     if (debounced.minRating) params.minRating = debounced.minRating;
     if (debounced.openNow) params.openNow = 'true';
+        if (debounced.verified) params.verified = 'true';
     if (location) {
       params.lat = location.lat;
       params.lng = location.lng;
@@ -262,6 +263,7 @@ export default function UserStores() {
                 <div className="tag-row">
                   <span className="tag">{cat.icon} {cat.label}</span>
                   {s.distanceKm !== null && <span className="tag near">📍 {formatDistance(s.distanceKm)} away</span>}
+                  {s.isVerified && <span className="tag verified">✓ Verified</span>}
                   {s.isOpenNow === true && <span className="tag open">Open now</span>}
                   {s.isOpenNow === false && <span className="tag closed">Closed</span>}
                 </div>

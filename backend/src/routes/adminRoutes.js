@@ -6,6 +6,7 @@ const {
   addStore,
   getStore,
   updateStore,
+  setStoreVerification,
   listUsers,
   listStores,
   getUserDetails,
@@ -21,7 +22,7 @@ const {
   ownerIdRule,
   handleValidation,
 } = require('../utils/validators');
-const { categoryRule, statusRule, storeProfileRules } = require('../utils/storeValidators');
+const { categoryRule, statusRule, storeProfileRules, verifiedRule } = require('../utils/storeValidators');
 
 const router = express.Router();
 
@@ -65,6 +66,7 @@ router.put(
   ],
   updateStore
 );
+router.put('/stores/:id/verification', [verifiedRule, handleValidation], setStoreVerification);
 
 router.get('/users', listUsers);
 router.get('/users/:id', getUserDetails);

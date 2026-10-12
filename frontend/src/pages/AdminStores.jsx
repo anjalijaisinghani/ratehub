@@ -5,9 +5,10 @@ import SortableTable from '../components/SortableTable.jsx';
 import Pagination from '../components/Pagination.jsx';
 import useDebounce from '../utils/useDebounce.js';
 import { CATEGORIES, categoryOf } from '../utils/storeCategories.js';
+import { confirmAction, toast, showError } from '../utils/alert.js';
 
 const PAGE_SIZE = 10;
-const emptyFilters = { name: '', email: '', address: '', city: '', category: '', status: '' };
+const emptyFilters = { name: '', email: '', address: '', city: '', category: '', status: '', verified: '' };
 
 export default function AdminStores() {
   const [filters, setFilters] = useState(emptyFilters);
@@ -17,6 +18,7 @@ export default function AdminStores() {
   const [result, setResult] = useState({ items: [], pagination: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0); // change this number to reload the table
 
   const debounced = useDebounce(filters, 400);
 
@@ -47,7 +49,7 @@ export default function AdminStores() {
     return () => {
       cancelled = true;
     };
-  }, [debounced, sortBy, order, page]);
+  }, [debounced, sortBy, order, page, reloadKey]);
 
   const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
@@ -64,10 +66,35 @@ export default function AdminStores() {
     setPage(1);
   };
 
+  const toggleVerified = async (store) => {
+    const verify = !store.isVerified;
+    const yes = await confirmAction(
+      verify ? 'Verify this store?' : 'Remove verification?',
+      verify
+        ? `${store.name} will show a ✓ Verified badge to customers.`
+        : `${store.name} will no longer show the ✓ Verified badge.`,
+      verify ? 'Yes, verify' : 'Yes, remove'
+    );
+    if (!yes) return;
+
+    try {
+      await api.put(`/admin/stores/${store.id}/verification`, { verified: verify });
+      toast(verify ? 'Store verified' : 'Verification removed');
+      setReloadKey((n) => n + 1);
+    } catch (err) {
+      showError(err.response?.data?.message || 'Could not change verification');
+    }
+  };
+
   const columns = [
     {
       key: 'name',
       label: 'Store Name',
+      render: (r) => (
+        <>
+          {r.name} {r.isVerified && <span className="verified-mark" title="Verified store">✓</span>}
+        </>
+      ),
     },
     { key: 'email', label: 'Email' },
     { key: 'address', label: 'Address' },
@@ -80,6 +107,20 @@ export default function AdminStores() {
       key: 'status',
       label: 'Status',
       render: (r) => <span className={`badge badge-${r.status}`}>{r.status}</span>,
+    },
+    {
+      key: 'verified',
+      label: 'Verified',
+      sortable: false,
+      render: (r) => (
+        <button
+          className={r.isVerified ? 'small secondary' : 'small'}
+          style={{ marginTop: 0 }}
+          onClick={() => toggleVerified(r)}
+        >
+          {r.isVerified ? '✓ Verified (remove)' : 'Verify'}
+        </button>
+      ),
     },
     {
       key: 'rating',
@@ -129,6 +170,11 @@ export default function AdminStores() {
             <option value="">Any status</option>
             <option value="ACTIVE">ACTIVE</option>
             <option value="INACTIVE">INACTIVE</option>
+          </select>
+          <select name="verified" value={filters.verified} onChange={handleFilterChange}>
+            <option value="">Verified or not</option>
+            <option value="true">Verified only</option>
+            <option value="false">Not verified</option>
           </select>
         </div>
 

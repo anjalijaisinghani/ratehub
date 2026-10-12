@@ -84,4 +84,9 @@ const storeProfileRules = [
   timeRule('closingTime', 'Closing time'),
 ];
 
-module.exports = { categoryRule, statusRule, storeProfileRules };
+// Only a real true or false. The text "yes" or the number 1 is rejected.
+const verifiedRule = body('verified')
+  .custom((value) => typeof value === 'boolean')
+  .withMessage('verified must be true or false');
+
+module.exports = { categoryRule, statusRule, storeProfileRules, verifiedRule };

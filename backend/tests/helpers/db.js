@@ -103,10 +103,11 @@ const ageTokens = (seconds) =>
 // Inserts a rating directly. With "text" it is a written review; without, a stars-only rating.
 const createReview = async ({ userId, storeId, rating = 5, text = null, reviewedAt = new Date() }) => {
   assertTestDatabase();
-  await db.query(
+  const [result] = await db.query(
     'INSERT INTO ratings (user_id, store_id, rating, review_text, reviewed_at) VALUES (?, ?, ?, ?, ?)',
     [userId, storeId, rating, text, text ? reviewedAt : null]
   );
+  return result.insertId;
 };
 
 

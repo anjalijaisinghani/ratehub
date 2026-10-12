@@ -19,6 +19,7 @@ const baseProfile = (r) => ({
   longitude: num(r.longitude),
   openingTime: hhmm(r.openingTime),
   closingTime: hhmm(r.closingTime),
+  isVerified: Number(r.isVerified) === 1,
 });
 
 // What a normal user sees (no store email, no status)
@@ -31,11 +32,13 @@ const toPublicStore = (r) => ({
   reviewCount: Number(r.reviewCount) || 0,
   myRating: r.myRating ?? null,
 });
+
 // A row in the admin table
 const toAdminStoreRow = (r) => ({
   ...baseProfile(r),
   email: r.email,
   status: r.status,
+  verifiedAt: r.verifiedAt ?? null,
   rating: num(r.rating),
   ratingCount: Number(r.ratingCount),
   createdAt: r.createdAt,
@@ -46,6 +49,7 @@ const toAdminStoreDetails = (r) => ({
   ...baseProfile(r),
   email: r.email,
   status: r.status,
+  verifiedAt: r.verifiedAt ?? null,
   createdAt: r.createdAt,
   ownerId: r.ownerId,
   ownerName: r.ownerName,
